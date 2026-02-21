@@ -1108,57 +1108,97 @@ async function runHeatmap(){
   // Use pre-built common dates cache
   buildCommonDatesCache();
   const allDates=_commonDatesSorted;
-  if(allDates.length<60){showErr('データが不足しています（最低60日必要）');busy=false;document.getElementById('run-btn').disabled=false;document.getElementById('progress-wrap').classList.remove('show');return;}
+  const N=allDates.length;
+  if(N<60){showErr('データが不足しています（最低60日必要）');busy=false;document.getElementById('run-btn').disabled=false;document.getElementById('progress-wrap').classList.remove('show');return;}
 
-  // Collect first day of each month as start candidates
-  const monthStarts=[];
-  let prevYM='';
-  for(const d of allDates){
-    const ym=d.slice(0,7);
-    if(ym!==prevYM){monthStarts.push(d);prevYM=ym;}
-  }
-  // Keep starts that have at least 22 trading days of data after them
-  const validStarts=monthStarts.filter((_,idx)=>(allDates.length - monthStarts.indexOf(monthStarts[idx]))>=22);
+  // ── Simulate from EVERY trading day as start, collect per-month averages ──
+  // We need at least 22 trading days of future data to produce a meaningful metric.
+  // For each start date we slice from that date to the end of allDates.
+  // Results are bucketed by YYYY-MM and averaged.
+  //
+  // Performance: N=7500 dates × one portSeries call each.
+  // buildIdx is the expensive part; we share the full pre-computed index arrays
+  // and slice them with typed-array views instead of rebuilding each time.
 
-  // Result map: {ym: value}
-  const results={};
-  for(let i=0;i<validStarts.length;i++){
-    const sd=validStarts[i];
-    // Binary search start index in allDates
-    let lo=0,hi=allDates.length-1,si2=allDates.length;
-    while(lo<=hi){const mid=(lo+hi)>>1;if(allDates[mid]>=sd){si2=mid;hi=mid-1;}else lo=mid+1;}
-    const dates=allDates.slice(si2);
-    if(dates.length<2){results[sd.slice(0,7)]=null;continue;}
-    const{ti,si,gi,ji}=buildIdx(dates);
-    const{series:ps}=portSeries(ti,si,gi,ji,a,rbOn,rbThresh,rbMode,dates);
-    const m=calcMetrics(ps,dates);
+  // Pre-build full index arrays once (base = allDates[0])
+  const fullIdx = buildIdx(allDates); // {ti,si,gi,ji}
+  const {ti:FT,si:FS,gi:FG,ji:FJ} = fullIdx;
+
+  // Accumulator: ymKey → {sum, count}
+  const acc = {};
+
+  // How many start dates have enough data (need >=22 points after start)
+  const maxStart = N - 22;
+
+  for(let i=0; i<=maxStart; i++){
+    // Slice pre-built index arrays from position i onward
+    // (typed array .slice() is O(k) but avoids re-parsing dates)
+    const ti2 = FT.slice ? FT.slice(i) : FT.slice(i);
+    const si2 = FS.slice(i);
+    const gi2 = FG.slice(i);
+    // FJ may be array of nulls or Float64Array depending on JGB presence
+    const ji2 = FJ[0]!==null ? (FJ.slice ? FJ.slice(i) : Array.from(FJ).slice(i)) : FJ.slice(i);
+
+    // Re-base each index so value at position 0 = 100
+    // (buildIdx already normalises to base 100 at allDates[0], not at i)
+    // So we need to re-normalise: divide every element by element[0]×0.01
+    const base_t = ti2[0]/100, base_s = si2[0]/100, base_g = gi2[0]/100;
+    const base_j = (FJ[0]!==null) ? ji2[0]/100 : 1;
+    const n2 = ti2.length;
+    const ti3=new Float64Array(n2), si3=new Float64Array(n2);
+    const gi3=new Float64Array(n2), ji3= FJ[0]!==null ? new Float64Array(n2) : null;
+    for(let k=0;k<n2;k++){
+      ti3[k]=ti2[k]/base_t; si3[k]=si2[k]/base_s; gi3[k]=gi2[k]/base_g;
+      if(ji3) ji3[k]=ji2[k]/base_j;
+    }
+    const dates2 = allDates.slice(i); // string slice — lightweight reference
+    const ji3null = ji3 ? Array.from(ji3) : dates2.map(()=>null);
+
+    const{series:ps}=portSeries(ti3,si3,gi3,ji3null,a,rbOn,rbThresh,rbMode,dates2);
+    const m=calcMetrics(ps,dates2);
+
     let val;
-    if(metricKey==='cagr')val=m.cagr*100;
-    else if(metricKey==='dd')val=-m.maxDD*100;// neg so green=good
-    else if(metricKey==='neg')val=-m.negDays;
-    else val=m.maxDD>0.001?m.cagr/m.maxDD:m.cagr*100;
-    results[sd.slice(0,7)]=val;
-    if(i%5===0){
-      const pct=Math.round((i+1)/validStarts.length*100);
+    if(metricKey==='cagr')     val = m.cagr*100;
+    else if(metricKey==='dd')  val = -m.maxDD*100;   // negate: green = small DD = good
+    else if(metricKey==='neg') val = -m.negDays;      // negate: green = few negative days = good
+    else                       val = m.maxDD>0.001 ? m.cagr/m.maxDD : (m.cagr>=0?999:-999);
+
+    if(!isFinite(val)) val=0;
+
+    const ym = allDates[i].slice(0,7);
+    if(!acc[ym]) acc[ym]={sum:0,count:0};
+    acc[ym].sum += val;
+    acc[ym].count++;
+
+    // Yield to UI every 50 iterations
+    if(i%50===0){
+      const pct=Math.round((i+1)/(maxStart+1)*100);
       document.getElementById('prog-fill').style.width=pct+'%';
       document.getElementById('prog-pct').textContent=pct+'%';
-      document.getElementById('prog-text').textContent=`計算中 ${i+1}/${validStarts.length}`;
+      document.getElementById('prog-text').textContent=`計算中 ${i+1}/${maxStart+1}日`;
       await sleep(0);
     }
+  }
+
+  // Convert accumulators to averages
+  const results={};
+  for(const ym of Object.keys(acc)){
+    results[ym] = acc[ym].count>0 ? acc[ym].sum/acc[ym].count : null;
   }
 
   busy=false;
   document.getElementById('run-btn').disabled=false;
   document.getElementById('progress-wrap').classList.remove('show');
 
-  renderHeatmap(results,metricKey);
+  renderHeatmap(results,metricKey,'avg');
 }
 
-function renderHeatmap(results,metricKey){
+function renderHeatmap(results,metricKey,mode){
   const card=document.getElementById('heatmap-card');
   card.classList.add('show');
-  const metricLabels={cagr:'CAGR年率(%)',dd:'最大DD(%、緑=小)',neg:'元本割れ日数(緑=少)',calmar:'Calmar比率'};
-  document.getElementById('hm-subtitle').textContent=metricLabels[metricKey]+' | 各月始まりを開始日としてシミュレーション';
+  const metricLabels={cagr:'CAGR年率(%) 月平均',dd:'最大DD(%) 月平均（緑=小）',neg:'元本割れ日数 月平均（緑=少）',calmar:'Calmar比率 月平均'};
+  const modeLabel = mode==='avg' ? '全営業日始まりの月平均' : '各月初日始まり';
+  document.getElementById('hm-subtitle').textContent=metricLabels[metricKey]+' | '+modeLabel;
 
   const yms=Object.keys(results).sort();
   const years=[...new Set(yms.map(ym=>ym.slice(0,4)))].sort();
@@ -1191,9 +1231,16 @@ function renderHeatmap(results,metricKey){
       const ym=`${yr}-${mo}`;
       const val=results[ym];
       const bg=colorForVal(val);
-      const txt=val!==null?(metricKey==='neg'?(-val).toFixed(0):metricKey==='dd'?(-val).toFixed(1):val.toFixed(2)):'';
+      // Display: DD and neg were negated for color scaling → show absolute value
+      let dispTxt='';
+      if(val!==null){
+        if(metricKey==='dd')       dispTxt=(-val).toFixed(1);  // stored as -DD, show DD
+        else if(metricKey==='neg') dispTxt=(-val).toFixed(0);  // stored as -neg, show neg
+        else                       dispTxt=val.toFixed(2);
+      }
+      const txt=dispTxt;
       const textColor=val!==null?(Math.abs(val-vmin)/(vmax-vmin||1)>0.3?'#fff':'#111'):'var(--muted)';
-      const title=val!==null?`${ym}: ${txt}`:'データなし';
+      const title=val!==null?`${ym}: ${txt} (${metricKey==='dd'||metricKey==='neg'?'月平均(絶対値)':'月平均'})`:'データなし';
       html+=`<td style="background:${bg};border-radius:4px;width:52px;height:28px;text-align:center;color:${textColor};font-family:'JetBrains Mono',monospace;cursor:default;" title="${title}">${txt}</td>`;
     }
     html+=`</tr>`;
