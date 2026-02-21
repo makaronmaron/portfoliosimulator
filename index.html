@@ -320,7 +320,32 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
 
   <!-- ③ Heatmap settings -->
   <div id="sec-hm" style="display:none">
-    <div class="sec-label">③ 全期間評価設定</div>
+    <div class="sec-label">③ 全期間評価 — 配分 &amp; 指標設定</div>
+    <!-- Allocation sliders for heatmap mode -->
+    <div class="alloc-block" style="margin-bottom:.7rem;">
+      <div class="alloc-row">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot dt"></span>TOPIX</div>
+          <input class="num-in" id="hm-n-topix" type="number" min="0" max="100" value="40" oninput="hmSyncNum('topix')"></div>
+        <input type="range" class="rt" id="hm-sl-topix" min="0" max="100" value="40" oninput="hmSyncSl('topix')">
+      </div>
+      <div class="alloc-row">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot ds"></span>S&amp;P 500</div>
+          <input class="num-in" id="hm-n-sp" type="number" min="0" max="100" value="35" oninput="hmSyncNum('sp')"></div>
+        <input type="range" class="rs" id="hm-sl-sp" min="0" max="100" value="35" oninput="hmSyncSl('sp')">
+      </div>
+      <div class="alloc-row">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot dg"></span>Gold</div>
+          <input class="num-in" id="hm-n-gold" type="number" min="0" max="100" value="25" oninput="hmSyncNum('gold')"></div>
+        <input type="range" class="rg" id="hm-sl-gold" min="0" max="100" value="25" oninput="hmSyncSl('gold')">
+      </div>
+      <div class="alloc-row" id="hm-row-jgb" style="display:none">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot dj"></span>日本国債</div>
+          <input class="num-in" id="hm-n-jgb" type="number" min="0" max="100" value="0" oninput="hmSyncNum('jgb')"></div>
+        <input type="range" class="rj" id="hm-sl-jgb" min="0" max="100" value="0" oninput="hmSyncSl('jgb')">
+      </div>
+      <div class="total-bar"><span>合計</span><span class="tv ok" id="hm-total-disp">100%</span></div>
+    </div>
+    <!-- Metric selector -->
     <div class="opt-settings">
       <div class="opt-row"><span class="opt-label">表示指標</span>
         <select class="opt-select" id="hm-metric">
@@ -518,7 +543,7 @@ function loadCSV(key,input){
       if(key==='jgb') _jgbKeysSorted=null;
       document.getElementById('card-'+key).classList.add('loaded');
       document.getElementById('sts-'+key).textContent=Object.keys(raw[key]).length+'件';
-      if(key==='jgb') document.getElementById('row-jgb').style.display='';
+      if(key==='jgb'){ document.getElementById('row-jgb').style.display=''; document.getElementById('hm-row-jgb').style.display=''; }
       setDefaultDate();
       if(appMode==='manual') autoRun();
     }catch(err){showErr('CSVエラー['+key+']: '+err.message);}
@@ -590,6 +615,27 @@ function getAlloc(){
 function updateTotal(){
   const a=getAlloc(),tot=a.t+a.s+a.g+a.j;
   const el=document.getElementById('total-disp');
+  el.textContent=tot+'%';el.className='tv '+(tot===100?'ok':'ng');
+}
+
+// ── Heatmap-mode allocation controls ──
+function hmSyncSl(k){document.getElementById('hm-n-'+k).value=document.getElementById('hm-sl-'+k).value;hmUpdateTotal();}
+function hmSyncNum(k){
+  let v=Math.max(0,Math.min(100,parseInt(document.getElementById('hm-n-'+k).value)||0));
+  document.getElementById('hm-n-'+k).value=v;document.getElementById('hm-sl-'+k).value=v;
+  hmUpdateTotal();
+}
+function hmGetAlloc(){
+  return{
+    t:parseInt(document.getElementById('hm-n-topix').value)||0,
+    s:parseInt(document.getElementById('hm-n-sp').value)||0,
+    g:parseInt(document.getElementById('hm-n-gold').value)||0,
+    j:raw.jgb?(parseInt(document.getElementById('hm-n-jgb').value)||0):0,
+  };
+}
+function hmUpdateTotal(){
+  const a=hmGetAlloc(),tot=a.t+a.s+a.g+a.j;
+  const el=document.getElementById('hm-total-disp');
   el.textContent=tot+'%';el.className='tv '+(tot===100?'ok':'ng');
 }
 
@@ -851,7 +897,7 @@ function onRun(){if(busy)return;if(appMode==='manual')runSim();else if(appMode==
 // ═══════════════════════════════════════════════════
 //  MANUAL SIM
 // ═══════════════════════════════════════════════════
-function runSim(overrideAlloc){
+function runSim(overrideAlloc, _fromOpt){
   clearErr();
   const a=overrideAlloc||getAlloc();
   if(!overrideAlloc&&a.t+a.s+a.g+a.j!==100){showErr('配分合計が100%ではありません');return;}
@@ -910,8 +956,10 @@ function runSim(overrideAlloc){
   redrawMainChart();
   updateCompTable(dates,ti,si,gi,ji,rbOn,rbThresh,a,ps);
   renderRBHistory(rbLog,rbOn,a);
-  document.getElementById('opt-result').classList.remove('show');
-  document.getElementById('iter-card').classList.remove('show');
+  if(!_fromOpt){
+    document.getElementById('opt-result').classList.remove('show');
+    document.getElementById('iter-card').classList.remove('show');
+  }
   document.getElementById('heatmap-card').classList.remove('show');
 }
 
@@ -1045,8 +1093,8 @@ function renderRBHistory(rbLog,rbOn,alloc){
 // ═══════════════════════════════════════════════════
 async function runHeatmap(){
   clearErr();
-  const a=getAlloc();
-  if(a.t+a.s+a.g+a.j!==100){showErr('配分合計が100%ではありません');return;}
+  const a=hmGetAlloc();
+  if(a.t+a.s+a.g+a.j!==100){showErr('配分合計が100%ではありません（全期間モードの配分スライダーで設定してください）');return;}
   if(!raw.topix||!raw.sp||!raw.gold||!raw.usdjpy){showErr('4つのCSVをインポートしてください');return;}
 
   busy=true;
@@ -1057,10 +1105,9 @@ async function runHeatmap(){
   const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
   const metricKey=document.getElementById('hm-metric').value;
 
-  // Get all available dates
-  const allDates=Object.keys(raw.topix)
-    .filter(d=>raw.sp[d]!==undefined&&raw.gold[d]!==undefined&&raw.usdjpy[d]!==undefined)
-    .sort();
+  // Use pre-built common dates cache
+  buildCommonDatesCache();
+  const allDates=_commonDatesSorted;
   if(allDates.length<60){showErr('データが不足しています（最低60日必要）');busy=false;document.getElementById('run-btn').disabled=false;document.getElementById('progress-wrap').classList.remove('show');return;}
 
   // Collect first day of each month as start candidates
@@ -1070,17 +1117,17 @@ async function runHeatmap(){
     const ym=d.slice(0,7);
     if(ym!==prevYM){monthStarts.push(d);prevYM=ym;}
   }
-  // Need at least 12 months of data after start
-  const validStarts=monthStarts.filter(sd=>{
-    const remaining=allDates.filter(d=>d>=sd);
-    return remaining.length>=22;// ~1 month minimum
-  });
+  // Keep starts that have at least 22 trading days of data after them
+  const validStarts=monthStarts.filter((_,idx)=>(allDates.length - monthStarts.indexOf(monthStarts[idx]))>=22);
 
   // Result map: {ym: value}
   const results={};
   for(let i=0;i<validStarts.length;i++){
     const sd=validStarts[i];
-    const dates=allDates.filter(d=>d>=sd);
+    // Binary search start index in allDates
+    let lo=0,hi=allDates.length-1,si2=allDates.length;
+    while(lo<=hi){const mid=(lo+hi)>>1;if(allDates[mid]>=sd){si2=mid;hi=mid-1;}else lo=mid+1;}
+    const dates=allDates.slice(si2);
     if(dates.length<2){results[sd.slice(0,7)]=null;continue;}
     const{ti,si,gi,ji}=buildIdx(dates);
     const{series:ps}=portSeries(ti,si,gi,ji,a,rbOn,rbThresh,rbMode,dates);
@@ -1165,78 +1212,145 @@ function renderHeatmap(results,metricKey){
 }
 
 // ═══════════════════════════════════════════════════
-//  BAYESIAN OPTIMIZATION (unchanged, 4D)
+//  OPTIMIZATION ENGINE
+//  Strategy: 3-phase random search on integer allocation space
+//    Phase 1 (30%): wide uniform random  → explore
+//    Phase 2 (50%): neighbour search ±12% around best  → exploit
+//    Phase 3 (20%): tight search  ±4% around best  → fine-tune
+//  Much faster and more reliable than GP on this low-dim integer grid.
 // ═══════════════════════════════════════════════════
-class GP{
-  constructor(ls=0.28,n=1e-4){this.ls=ls;this.noise=n;this.X=[];this.y=[];this.L=null;this.alpha=null;}
-  k(a,b){let s=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];s+=d*d;}return Math.exp(-s/(2*this.ls*this.ls));}
-  _chol(K){const n=K.length,L=Array.from({length:n},()=>new Float64Array(n));for(let i=0;i<n;i++)for(let j=0;j<=i;j++){let s=K[i][j];for(let k=0;k<j;k++)s-=L[i][k]*L[j][k];L[i][j]=j<i?s/L[j][j]:Math.sqrt(Math.max(s,1e-12));}return L;}
-  _fwd(L,b){const n=b.length,x=new Float64Array(n);for(let i=0;i<n;i++){let s=b[i];for(let j=0;j<i;j++)s-=L[i][j]*x[j];x[i]=s/L[i][i];}return x;}
-  _bwd(L,b){const n=b.length,x=new Float64Array(n);for(let i=n-1;i>=0;i--){let s=b[i];for(let j=i+1;j<n;j++)s-=L[j][i]*x[j];x[i]=s/L[i][i];}return x;}
-  add(x,y){this.X.push(x);this.y.push(y);const n=this.X.length;const K=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>this.k(this.X[i],this.X[j])+(i===j?this.noise:0)));this.L=this._chol(K);this.alpha=this._bwd(this.L,this._fwd(this.L,this.y));}
-  predict(x){if(!this.X.length)return{mean:0,std:1};const n=this.X.length,ks=Float64Array.from({length:n},(_,i)=>this.k(x,this.X[i]));let mean=0;for(let i=0;i<n;i++)mean+=ks[i]*this.alpha[i];const v=this._fwd(this.L,ks);let var_=this.k(x,x);for(let i=0;i<n;i++)var_-=v[i]*v[i];return{mean,std:Math.sqrt(Math.max(var_,0))};}
-  ei(x,yB){const{mean,std}=this.predict(x);if(std<1e-9)return 0;const z=(mean-yB)/std;return(mean-yB)*ncdf(z)+std*npdf(z);}
-}
+
 function ncdf(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.7814779+t*(-1.8212560+t*1.3302744))));return z>0?1-p:p;}
 function npdf(z){return Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);}
-function rand4(mn,mx,useJ){for(let i=0;i<400;i++){const t=Math.round(mn+Math.random()*(mx-mn));const sm=Math.min(mx,100-t-mn-(useJ?mn:0));if(sm<mn)continue;const s=Math.round(mn+Math.random()*(sm-mn));const gm=Math.min(mx,100-t-s-(useJ?mn:0));if(gm<mn)continue;const g=Math.round(mn+Math.random()*(gm-mn));const j=useJ?100-t-s-g:0;if(useJ&&(j<mn||j>mx))continue;if(!useJ&&t+s+g!==100)continue;return{t,s,g,j};}return null;}
-function enc4(a){return[a.t/100,a.s/100,a.g/100,a.j/100];}
+
+// Generate a random valid allocation within [mn,mx] per asset, summing to 100
+function rand4(mn, mx, useJ, center, spread){
+  // center: {t,s,g,j} optional — if given, sample near it within ±spread
+  const nAssets = useJ ? 4 : 3;
+  for(let attempt=0; attempt<800; attempt++){
+    let t,s,g,j=0;
+    if(center && spread){
+      // Perturb each dimension by ±spread, then re-normalise to 100
+      const perturbedT = Math.round(center.t + (Math.random()*2-1)*spread);
+      const perturbedS = Math.round(center.s + (Math.random()*2-1)*spread);
+      const perturbedG = Math.round(center.g + (Math.random()*2-1)*spread);
+      const perturbedJ = useJ ? Math.round(center.j + (Math.random()*2-1)*spread) : 0;
+      // Clamp to [mn,mx]
+      t = Math.max(mn, Math.min(mx, perturbedT));
+      s = Math.max(mn, Math.min(mx, perturbedS));
+      g = Math.max(mn, Math.min(mx, perturbedG));
+      j = useJ ? Math.max(mn, Math.min(mx, perturbedJ)) : 0;
+      // Re-normalise to 100 by scaling
+      const total = t+s+g+j;
+      if(total===0) continue;
+      t=Math.round(t/total*100); s=Math.round(s/total*100);
+      g=Math.round(g/total*100); j=useJ?100-t-s-g:0;
+      if(t<mn||t>mx||s<mn||s>mx||g<mn||g>mx) continue;
+      if(useJ&&(j<mn||j>mx)) continue;
+      if(t+s+g+(useJ?j:0)!==100) continue;
+    } else {
+      // Pure uniform random
+      t = Math.round(mn + Math.random()*(mx-mn));
+      const sm = Math.min(mx, 100-t-mn*(nAssets-1));
+      if(sm < mn) continue;
+      s = Math.round(mn + Math.random()*(sm-mn));
+      const gm = Math.min(mx, 100-t-s-mn*(nAssets-2));
+      if(gm < mn) continue;
+      g = Math.round(mn + Math.random()*(gm-mn));
+      j = useJ ? 100-t-s-g : 0;
+      if(!useJ && t+s+g!==100) continue;
+      if(useJ&&(j<mn||j>mx)) continue;
+    }
+    return {t,s,g,j};
+  }
+  return null;
+}
+
 function objScore(ti,si,gi,ji,alloc,objKey,dates,rbOn,rbThresh){
   const{series:s}=portSeries(ti,si,gi,ji,alloc,rbOn,rbThresh,rbMode,dates);
   const{maxDD,cagr,vol}=calcMetrics(s,dates);
-  if(objKey==='calmar')return maxDD>0.0001?cagr/maxDD:(cagr>0?cagr*999:-999);
-  if(objKey==='sharpe')return vol>0.0001?cagr/vol:(cagr>0?cagr*999:-999);
+  if(objKey==='calmar') return maxDD>0.0001 ? cagr/maxDD : (cagr>0?cagr*100:-100);
+  if(objKey==='sharpe')  return vol>0.0001  ? cagr/vol  : (cagr>0?cagr*100:-100);
   return cagr;
 }
+
 async function runOpt(){
   clearErr();
   if(!raw.topix||!raw.sp||!raw.gold||!raw.usdjpy){showErr('4つのCSVをインポートしてください');return;}
-  const sd=document.getElementById('start-date').value;if(!sd){showErr('開始日を選択');return;}
-  const dates=getDates(sd);if(dates.length<10){showErr('データ不足');return;}
+  const sd=document.getElementById('start-date').value;
+  if(!sd){showErr('開始日を選択してください');return;}
+  const dates=getDates(sd);
+  if(dates.length<10){showErr('データ不足');return;}
   const{ti,si,gi,ji}=buildIdx(dates);
-  const objKey=document.getElementById('opt-obj').value;
-  const iters=Math.min(300,Math.max(20,parseInt(document.getElementById('opt-iters').value)||80));
-  const mn=Math.max(0,parseInt(document.getElementById('opt-min').value)||0);
-  const mx=Math.min(100,parseInt(document.getElementById('opt-max').value)||100);
-  const useJ=raw.jgb!==null;
-  if(mn*(useJ?4:3)>100){showErr('最小配分合計が100%超');return;}
-  const rbOn=document.getElementById('rb-toggle').checked;
-  const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
-  busy=true;document.getElementById('run-btn').disabled=true;document.getElementById('progress-wrap').classList.add('show');
-  const gp=new GP();let bestScore=-Infinity,bestPt=null;
-  const hS=[],hB=[];
-  const initN=Math.max(5,Math.floor(iters*.2));
-  for(let i=0;i<initN;i++){
-    const pt=rand4(mn,mx,useJ);if(!pt)continue;
-    const sc=objScore(ti,si,gi,ji,pt,objKey,dates,rbOn,rbThresh);
-    if(isFinite(sc)){gp.add(enc4(pt),sc);hS.push(sc);if(sc>bestScore){bestScore=sc;bestPt=pt;}}
-    else hS.push(bestScore===-Infinity?0:bestScore);
+
+  const objKey = document.getElementById('opt-obj').value;
+  const iters  = Math.min(500, Math.max(20, parseInt(document.getElementById('opt-iters').value)||80));
+  const mn     = Math.max(0,   parseInt(document.getElementById('opt-min').value)||0);
+  const mx     = Math.min(100, parseInt(document.getElementById('opt-max').value)||100);
+  const useJ   = raw.jgb !== null;
+  const rbOn   = document.getElementById('rb-toggle').checked;
+  const rbThresh = parseFloat(document.getElementById('rb-threshold').value)||5;
+
+  if(mn*(useJ?4:3) > 100){showErr('最小配分の合計が100%を超えています');return;}
+
+  busy=true;
+  document.getElementById('run-btn').disabled=true;
+  document.getElementById('progress-wrap').classList.add('show');
+
+  let bestScore=-Infinity, bestPt=null;
+  const hS=[], hB=[];
+
+  // Phase boundaries
+  const ph1End = Math.floor(iters * 0.30);  // wide random
+  const ph2End = Math.floor(iters * 0.80);  // neighbour ±12%
+  // rest: tight ±4%
+
+  for(let it=0; it<iters; it++){
+    let pt;
+    if(it < ph1End){
+      // Phase 1: pure uniform random
+      pt = rand4(mn, mx, useJ);
+    } else if(it < ph2End){
+      // Phase 2: perturb best ±12%, fallback to random
+      pt = (bestPt ? rand4(mn, mx, useJ, bestPt, 12) : null) || rand4(mn, mx, useJ);
+    } else {
+      // Phase 3: tight refinement ±4%
+      pt = (bestPt ? rand4(mn, mx, useJ, bestPt, 4) : null) || rand4(mn, mx, useJ);
+    }
+    if(!pt){ hS.push(bestScore===-Infinity?null:bestScore); hB.push(bestScore===-Infinity?null:bestScore); continue; }
+
+    const sc = objScore(ti,si,gi,ji,pt,objKey,dates,rbOn,rbThresh);
+    hS.push(isFinite(sc)?sc:null);
+    if(isFinite(sc) && sc > bestScore){ bestScore=sc; bestPt={...pt}; }
     hB.push(bestScore===-Infinity?null:bestScore);
-    updProg(i+1,iters,bestScore,objKey);if(i%3===0)await sleep(0);
+
+    updProg(it+1, iters, bestScore, objKey);
+    if(it%8===0) await sleep(0);
   }
-  for(let it=initN;it<iters;it++){
-    let bEI=-Infinity,cand=null;
-    for(let c=0;c<250;c++){const pt=rand4(mn,mx,useJ);if(!pt)continue;const ei=gp.ei(enc4(pt),bestScore);if(ei>bEI){bEI=ei;cand=pt;}}
-    const pt=cand||rand4(mn,mx,useJ);if(!pt){hS.push(bestScore);hB.push(bestScore);continue;}
-    const sc=objScore(ti,si,gi,ji,pt,objKey,dates,rbOn,rbThresh);
-    if(isFinite(sc)){gp.add(enc4(pt),sc);hS.push(sc);if(sc>bestScore){bestScore=sc;bestPt=pt;}}
-    else hS.push(bestScore);
-    hB.push(bestScore);
-    updProg(it+1,iters,bestScore,objKey);if(it%5===0)await sleep(0);
-  }
-  busy=false;document.getElementById('run-btn').disabled=false;document.getElementById('progress-wrap').classList.remove('show');
+
+  busy=false;
+  document.getElementById('run-btn').disabled=false;
+  document.getElementById('progress-wrap').classList.remove('show');
+
   if(!bestPt){showErr('有効な配分が見つかりませんでした');return;}
-  const objLbls={calmar:'Calmar',sharpe:'Sharpe',return:'CAGR年率'};
-  document.getElementById('oav-topix').textContent=bestPt.t+'%';
-  document.getElementById('oav-sp').textContent=bestPt.s+'%';
-  document.getElementById('oav-gold').textContent=bestPt.g+'%';
-  document.getElementById('oav-jgb').textContent=useJ?bestPt.j+'%':'—';
-  document.getElementById('osr-label').textContent=objLbls[objKey];
-  document.getElementById('osr-val').textContent=objKey==='return'?(bestScore*100).toFixed(2)+'%':bestScore.toFixed(3);
-  document.getElementById('osr-iter').textContent='試行: '+hS.length+'回';
+
+  // Show results
+  const objLbls={calmar:'Calmar比率',sharpe:'Sharpe比率',return:'CAGR年率'};
+  document.getElementById('oav-topix').textContent = bestPt.t+'%';
+  document.getElementById('oav-sp').textContent    = bestPt.s+'%';
+  document.getElementById('oav-gold').textContent  = bestPt.g+'%';
+  document.getElementById('oav-jgb').textContent   = useJ ? bestPt.j+'%' : '—';
+  document.getElementById('osr-label').textContent = objLbls[objKey];
+  document.getElementById('osr-val').textContent   = objKey==='return'
+    ? (bestScore*100).toFixed(2)+'%' : bestScore.toFixed(3);
+  document.getElementById('osr-iter').textContent  = '試行: '+hS.length+'回';
+
+  // Run simulation with best allocation (pass flag to preserve opt-result display)
+  runSim(bestPt, true);
+
+  // Show opt-result and iter-chart AFTER runSim (runSim may update DOM)
   document.getElementById('opt-result').classList.add('show');
-  runSim(bestPt);
-  drawIterChart(hS,hB,objLbls[objKey]);
+  drawIterChart(hS, hB, objLbls[objKey]);
   document.getElementById('iter-card').classList.add('show');
 }
 function updProg(cur,tot,best,obj){
