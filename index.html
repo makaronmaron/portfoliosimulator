@@ -15,7 +15,7 @@
   --text:#e2e8f0;--text2:#94a3b8;--muted:#4b6484;
   --c0:#00c8f8;--c1:#a78bfa;--c2:#34d399;--c3:#fbbf24;
   --c4:#f87171;--c5:#fb923c;--c6:#e879f9;--c7:#4ade80;
-  --topix:#3b82f6;--sp:#10b981;--xau:#f59e0b;--jgb:#a78bfa;
+  --topix:#3b82f6;--sp:#10b981;--xau:#f59e0b;--jgb:#a78bfa;--ustb:#38bdf8;
   --sidebar:410px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -256,10 +256,14 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
         <div class="aname" style="color:var(--muted)">USD/JPY</div>
         <div class="asub"><span class="sdot" id="sdot-usdjpy"></span><span id="sts-usdjpy">未読込</span></div>
         <div style="font-size:.55rem;color:var(--muted);margin-top:.1rem;font-family:'JetBrains Mono',monospace">data/usdjpy.csv</div></label>
-      <label class="upload-card" id="card-jgb" style="grid-column:1/-1"><input type="file" accept=".csv" onchange="loadCSV('jgb',this)">
-        <div class="aname" style="color:var(--jgb)">日本国債 <span style="font-size:.6rem;color:var(--muted);font-weight:400">（日付,1年利回り% 任意）</span></div>
+      <label class="upload-card" id="card-jgb"><input type="file" accept=".csv" onchange="loadCSV('jgb',this)">
+        <div class="aname" style="color:var(--jgb)">日本国債 <span style="font-size:.6rem;color:var(--muted);font-weight:400">（利回り% 任意）</span></div>
         <div class="asub"><span class="sdot" id="sdot-jgb"></span><span id="sts-jgb">未読込（任意）</span></div>
         <div style="font-size:.55rem;color:var(--muted);margin-top:.1rem;font-family:'JetBrains Mono',monospace">data/jgb.csv</div></label>
+      <label class="upload-card" id="card-ustb"><input type="file" accept=".csv" onchange="loadCSV('ustb',this)">
+        <div class="aname" style="color:var(--ustb)">米国債 <span style="font-size:.6rem;color:var(--muted);font-weight:400">（価格 USD建て 任意）</span></div>
+        <div class="asub"><span class="sdot" id="sdot-ustb"></span><span id="sts-ustb">未読込（任意）</span></div>
+        <div style="font-size:.55rem;color:var(--muted);margin-top:.1rem;font-family:'JetBrains Mono',monospace">data/ustb.csv</div></label>
     </div>
     <p style="font-size:.6rem;color:var(--muted);margin-top:.3rem;">CSV: 日付,値（ヘッダー不要）。<code style="font-family:'JetBrains Mono',monospace">data/</code>フォルダにCSVを置くと自動読み込みされます。</p>
   </div>
@@ -298,6 +302,11 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
           <input class="num-in" id="n-jgb" type="number" min="0" max="100" value="10" oninput="syncNum('jgb')"></div>
         <input type="range" class="rj" id="sl-jgb" min="0" max="100" value="10" oninput="syncSl('jgb')">
       </div>
+      <div class="alloc-row" id="row-ustb" style="display:none">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot du"></span>米国債</div>
+          <input class="num-in" id="n-ustb" type="number" min="0" max="100" value="0" oninput="syncNum('ustb')"></div>
+        <input type="range" class="ru" id="sl-ustb" min="0" max="100" value="0" oninput="syncSl('ustb')">
+      </div>
       <div class="total-bar"><span>合計</span><span class="tv ok" id="total-disp">100%</span></div>
     </div>
   </div>
@@ -308,6 +317,9 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
     <div class="opt-settings">
       <div class="opt-row"><span class="opt-label">目的関数</span>
         <select class="opt-select" id="opt-obj">
+          <option value="balanced">バランス型（推奨）</option>
+          <option value="calmar_floor">Calmar+下限付き</option>
+          <option value="sharpe_floor">Sharpe+下限付き</option>
           <option value="calmar">Calmar (CAGR/MaxDD)</option>
           <option value="sharpe">Sharpe (CAGR/Vol)</option>
           <option value="return">最大リターン</option>
@@ -343,16 +355,22 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
           <input class="num-in" id="hm-n-jgb" type="number" min="0" max="100" value="0" oninput="hmSyncNum('jgb')"></div>
         <input type="range" class="rj" id="hm-sl-jgb" min="0" max="100" value="0" oninput="hmSyncSl('jgb')">
       </div>
+      <div class="alloc-row" id="hm-row-ustb" style="display:none">
+        <div class="alloc-rh"><div class="alloc-name"><span class="dot du"></span>米国債</div>
+          <input class="num-in" id="hm-n-ustb" type="number" min="0" max="100" value="0" oninput="hmSyncNum('ustb')"></div>
+        <input type="range" class="ru" id="hm-sl-ustb" min="0" max="100" value="0" oninput="hmSyncSl('ustb')">
+      </div>
       <div class="total-bar"><span>合計</span><span class="tv ok" id="hm-total-disp">100%</span></div>
     </div>
     <!-- Metric selector -->
     <div class="opt-settings">
       <div class="opt-row"><span class="opt-label">表示指標</span>
-        <select class="opt-select" id="hm-metric">
+        <select class="opt-select" id="hm-metric" onchange="onHmMetricChange()">
           <option value="cagr">CAGR年率</option>
           <option value="dd">最大DD</option>
           <option value="neg">元本割れ日数</option>
           <option value="calmar">Calmar比率</option>
+          <option value="sharpe">Sharpe比率</option>
         </select></div>
       <p style="font-size:.62rem;color:var(--muted);">全データ期間の各月始まりを開始日としてシミュレーション。月×年のヒートマップで成績分布を表示します。</p>
     </div>
@@ -423,6 +441,7 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
       <div class="opt-alloc-item"><div class="oai-name">S&P 500</div><div class="oai-val" id="oav-sp">—</div></div>
       <div class="opt-alloc-item"><div class="oai-name">Gold</div><div class="oai-val" id="oav-gold">—</div></div>
       <div class="opt-alloc-item"><div class="oai-name">日本国債</div><div class="oai-val" id="oav-jgb">—</div></div>
+      <div class="opt-alloc-item" id="oav-ustb-item" style="display:none"><div class="oai-name">米国債</div><div class="oai-val" id="oav-ustb">—</div></div>
     </div>
     <div class="opt-score-row">
       <span class="osr-label" id="osr-label">Calmar比率</span>
@@ -500,6 +519,15 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
     <div id="heatmap-container"></div>
   </div>
 
+  <!-- Heatmap detail chart (shown on cell/row click) -->
+  <div class="chart-card" id="hm-detail-card" style="display:none">
+    <div class="chart-header">
+      <div class="chart-title" style="color:var(--amber)" id="hm-detail-title">月別 平均推移</div>
+      <button onclick="document.getElementById('hm-detail-card').style.display='none'" style="font-size:.65rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:.2rem .5rem;border-radius:4px;border:1px solid var(--border)">✕ 閉じる</button>
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="hm-detail-chart"></canvas></div>
+  </div>
+
   <!-- Iter chart -->
   <div class="iter-card" id="iter-card">
     <div class="chart-header">
@@ -515,10 +543,10 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
 // ═══════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════
-const raw={topix:null,sp:null,gold:null,usdjpy:null,jgb:null};
+const raw={topix:null,sp:null,gold:null,usdjpy:null,jgb:null,ustb:null};
 let appMode='manual', rbMode='band', busy=false, periodView='full';
 let savedPortfolios=[];
-let mainChartInst=null, iterChartInst=null;
+let mainChartInst=null, iterChartInst=null, hmDetailChartInst=null;
 let currentDates=null, currentSeries={};
 let lastRBLog=[];
 const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)','var(--c7)'];
@@ -528,6 +556,9 @@ let _commonDatesSorted = null; // sorted date strings common to all 4 base asset
 let _commonTsMs = null;        // parallel Float64Array of timestamps in ms
 let _jgbKeysSorted = null;     // sorted JGB date keys for binary search
 let _autoRunTimer = null;      // debounce timer id
+let _hmRawMetrics = null;       // {ym: {cagr,dd,neg,vol}} — all metrics
+let _hmAlloc = null;           // allocation used in last heatmap run
+let _hmDatesByYM = null;       // {ym: [startIdx,...]} start indices in _commonDatesSorted
 
 // ═══════════════════════════════════════════════════
 //  CSV
@@ -543,7 +574,15 @@ function loadCSV(key,input){
       if(key==='jgb') _jgbKeysSorted=null;
       document.getElementById('card-'+key).classList.add('loaded');
       document.getElementById('sts-'+key).textContent=Object.keys(raw[key]).length+'件';
-      if(key==='jgb'){ document.getElementById('row-jgb').style.display=''; document.getElementById('hm-row-jgb').style.display=''; }
+      if(key==='jgb'){
+        document.getElementById('row-jgb').style.display='';
+        document.getElementById('hm-row-jgb').style.display='';
+      }
+      if(key==='ustb'){
+        document.getElementById('row-ustb').style.display='';
+        document.getElementById('hm-row-ustb').style.display='';
+        document.getElementById('oav-ustb-item').style.display='';
+      }
       setDefaultDate();
       if(appMode==='manual') autoRun();
     }catch(err){showErr('CSVエラー['+key+']: '+err.message);}
@@ -610,10 +649,12 @@ function getAlloc(){
     s:parseInt(document.getElementById('n-sp').value)||0,
     g:parseInt(document.getElementById('n-gold').value)||0,
     j:raw.jgb?(parseInt(document.getElementById('n-jgb').value)||0):0,
+    u:raw.ustb?(parseInt(document.getElementById('n-ustb').value)||0):0,
   };
 }
+function allocTotal(a){return a.t+a.s+a.g+a.j+a.u;}
 function updateTotal(){
-  const a=getAlloc(),tot=a.t+a.s+a.g+a.j;
+  const a=getAlloc(),tot=allocTotal(a);
   const el=document.getElementById('total-disp');
   el.textContent=tot+'%';el.className='tv '+(tot===100?'ok':'ng');
 }
@@ -631,10 +672,11 @@ function hmGetAlloc(){
     s:parseInt(document.getElementById('hm-n-sp').value)||0,
     g:parseInt(document.getElementById('hm-n-gold').value)||0,
     j:raw.jgb?(parseInt(document.getElementById('hm-n-jgb').value)||0):0,
+    u:raw.ustb?(parseInt(document.getElementById('hm-n-ustb').value)||0):0,
   };
 }
 function hmUpdateTotal(){
-  const a=hmGetAlloc(),tot=a.t+a.s+a.g+a.j;
+  const a=hmGetAlloc(),tot=allocTotal(a);
   const el=document.getElementById('hm-total-disp');
   el.textContent=tot+'%';el.className='tv '+(tot===100?'ok':'ng');
 }
@@ -779,25 +821,36 @@ function advanceOneYearMs(ms){
 
 function buildIdx(dates){
   const p0={t:raw.topix[dates[0]],s:raw.sp[dates[0]],g:raw.gold[dates[0]],fx:raw.usdjpy[dates[0]]};
-  const ti=[],si=[],gi=[];
+  const hasUSTB=!!raw.ustb;
+  const p0u=hasUSTB?(raw.ustb[dates[0]]??null):null;
+  const ti=[],si=[],gi=[],ui=[];
   for(const d of dates){
     const fx=raw.usdjpy[d];
     ti.push(raw.topix[d]/p0.t*100);
     si.push((raw.sp[d]*fx)/(p0.s*p0.fx)*100);
     gi.push((raw.gold[d]*fx)/(p0.g*p0.fx)*100);
+    // 米国債: USD価格×為替→円評価。価格がない日は直近補間
+    if(hasUSTB && p0u!==null){
+      const uv=raw.ustb[d]??null;
+      // 直近有効価格を補間
+      ui.push(uv!==null ? (uv*fx)/(p0u*p0.fx)*100 : (ui.length>0?ui[ui.length-1]:100));
+    } else {
+      ui.push(null);
+    }
   }
   const ji=buildJGBSeries(dates);
-  return{ti,si,gi,ji};
+  return{ti,si,gi,ji,ui};
 }
 
 // ── Portfolio series with rebalancing ──
-// Returns {series, rbLog} where rbLog = [{idx, date, trigger, wBefore, wAfter, portVal}]
-function portSeries(ti,si,gi,ji,alloc,rbOn,rbThreshPct,rbModeStr,dates){
-  const{t:wt,s:ws,g:wg,j:wj}=alloc;
-  const total=wt+ws+wg+wj;
-  const wts=wt/total,wss=ws/total,wgs=wg/total,wjs=wj/total;
+// Returns {series, rbLog}
+function portSeries(ti,si,gi,ji,ui,alloc,rbOn,rbThreshPct,rbModeStr,dates){
+  const{t:wt,s:ws,g:wg,j:wj,u:wu=0}=alloc;
+  const total=wt+ws+wg+wj+wu;
+  const wts=wt/total,wss=ws/total,wgs=wg/total,wjs=wj/total,wus=wu/total;
   const n=ti.length;
-  const hasJGB=ji[0]!==null;
+  const hasJGB=ji&&ji[0]!==null;
+  const hasUSTB=ui&&ui[0]!==null;
   // Pre-compute timestamps for date arithmetic (no new Date() inside hot loop)
   let datesTs=null;
   if(rbOn&&(rbModeStr==='6m'||rbModeStr==='1y')){
@@ -811,7 +864,7 @@ function portSeries(ti,si,gi,ji,alloc,rbOn,rbThreshPct,rbModeStr,dates){
   }
   const MS_180=180*86400000, MS_365=365*86400000;
   // Holdings as "initial fraction × scaling"
-  let ht=wts,hs=wss,hg=wgs,hj=wjs;
+  let ht=wts,hs=wss,hg=wgs,hj=wjs,hu=wus;
   const series=[100];
   const rbLog=[];
   let lastRBIdx=0;
@@ -819,13 +872,15 @@ function portSeries(ti,si,gi,ji,alloc,rbOn,rbThreshPct,rbModeStr,dates){
   for(let i=1;i<n;i++){
     const vt=ht*ti[i],vs=hs*si[i],vg=hg*gi[i];
     const vj=hasJGB?hj*ji[i]:0;
-    const portVal=vt+vs+vg+vj;
+    const vu=hasUSTB?hu*ui[i]:0;
+    const portVal=vt+vs+vg+vj+vu;
     series.push(portVal);
 
     if(rbOn){
       let needRB=false,trigger='';
       const curWt=vt/portVal,curWs=vs/portVal,curWg=vg/portVal;
       const curWj=hasJGB&&wjs>0?vj/portVal:wjs;
+      const curWu=hasUSTB&&wus>0?vu/portVal:wus;
 
       if(rbModeStr==='band'){
         const thresh=rbThreshPct/100;
@@ -833,6 +888,7 @@ function portSeries(ti,si,gi,ji,alloc,rbOn,rbThreshPct,rbModeStr,dates){
         else if(wss>0&&Math.abs(curWs-wss)/wss>thresh){needRB=true;trigger='S&P乖離';}
         else if(wgs>0&&Math.abs(curWg-wgs)/wgs>thresh){needRB=true;trigger='Gold乖離';}
         else if(wjs>0&&Math.abs(curWj-wjs)/wjs>thresh){needRB=true;trigger='国債乖離';}
+        else if(wus>0&&Math.abs(curWu-wus)/wus>thresh){needRB=true;trigger='米国債乖離';}
       } else if(rbModeStr==='6m'){
         if(datesTs[i]-datesTs[lastRBIdx]>=MS_180){needRB=true;trigger='半年経過';}
       } else if(rbModeStr==='1y'){
@@ -842,14 +898,15 @@ function portSeries(ti,si,gi,ji,alloc,rbOn,rbThreshPct,rbModeStr,dates){
       if(needRB){
         rbLog.push({
           idx:i,date:dates[i],trigger,
-          wBefore:{t:(curWt*100).toFixed(1),s:(curWs*100).toFixed(1),g:(curWg*100).toFixed(1),j:hasJGB?(curWj*100).toFixed(1):'—'},
-          wAfter:{t:(wts*100).toFixed(1),s:(wss*100).toFixed(1),g:(wgs*100).toFixed(1),j:hasJGB?(wjs*100).toFixed(1):'—'},
+          wBefore:{t:(curWt*100).toFixed(1),s:(curWs*100).toFixed(1),g:(curWg*100).toFixed(1),j:hasJGB?(curWj*100).toFixed(1):'—',u:hasUSTB?(curWu*100).toFixed(1):'—'},
+          wAfter:{t:(wts*100).toFixed(1),s:(wss*100).toFixed(1),g:(wgs*100).toFixed(1),j:hasJGB?(wjs*100).toFixed(1):'—',u:hasUSTB?(wus*100).toFixed(1):'—'},
           portVal:portVal.toFixed(2)
         });
         ht=(portVal*wts)/ti[i];
         hs=(portVal*wss)/si[i];
         hg=(portVal*wgs)/gi[i];
         if(hasJGB&&wjs>0)hj=(portVal*wjs)/ji[i];
+        if(hasUSTB&&wus>0)hu=(portVal*wus)/ui[i];
         lastRBIdx=i;
       }
     }
@@ -900,17 +957,17 @@ function onRun(){if(busy)return;if(appMode==='manual')runSim();else if(appMode==
 function runSim(overrideAlloc, _fromOpt){
   clearErr();
   const a=overrideAlloc||getAlloc();
-  if(!overrideAlloc&&a.t+a.s+a.g+a.j!==100){showErr('配分合計が100%ではありません');return;}
+  if(!overrideAlloc&&allocTotal(a)!==100){showErr('配分合計が100%ではありません');return;}
   if(!raw.topix||!raw.sp||!raw.gold||!raw.usdjpy){showErr('4つのCSVをインポートしてください');return;}
   const sd=document.getElementById('start-date').value;
   if(!sd){showErr('開始日を選択してください');return;}
   const dates=getDates(sd);
   if(dates.length<2){showErr('共通データが不足しています');return;}
-  const{ti,si,gi,ji}=buildIdx(dates);
+  const{ti,si,gi,ji,ui}=buildIdx(dates);
   const rbOn=document.getElementById('rb-toggle').checked;
   const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
-  const{series:ps,rbLog}=portSeries(ti,si,gi,ji,a,rbOn,rbThresh,rbMode,dates);
-  const{series:psNoRB}=portSeries(ti,si,gi,ji,a,false,0,'band',dates);
+  const{series:ps,rbLog}=portSeries(ti,si,gi,ji,ui,a,rbOn,rbThresh,rbMode,dates);
+  const{series:psNoRB}=portSeries(ti,si,gi,ji,ui,a,false,0,'band',dates);
   const metrics=calcMetrics(ps,dates);
   lastRBLog=rbLog;
 
@@ -946,9 +1003,10 @@ function runSim(overrideAlloc, _fromOpt){
   currentSeries.sp={label:'S&P',series:si,color:'rgba(16,185,129,.5)',fill:false,colorRGB:'16,185,129'};
   currentSeries.gold={label:'Gold',series:gi,color:'rgba(245,158,11,.5)',fill:false,colorRGB:'245,158,11'};
   if(ji[0]!==null)currentSeries.jgb={label:'日本国債',series:ji,color:'rgba(167,139,250,.5)',fill:false,colorRGB:'167,139,250'};
+  if(ui[0]!==null)currentSeries.ustb={label:'米国債',series:ui,color:'rgba(56,189,248,.5)',fill:false,colorRGB:'56,189,248'};
   savedPortfolios.forEach((p,i)=>{
     if(!p.visible)return;
-    const{series:ss}=portSeries(ti,si,gi,ji,p.alloc,rbOn,rbThresh,rbMode,dates);
+    const{series:ss}=portSeries(ti,si,gi,ji,ui,p.alloc,rbOn,rbThresh,rbMode,dates);
     const rgb=COLORSRGB[i%COLORSRGB.length];
     currentSeries['saved_'+i]={label:p.name,series:ss,color:`rgba(${rgb},1)`,fill:false,colorRGB:rgb};
   });
@@ -1041,7 +1099,7 @@ function updateCompTable(dates,ti,si,gi,ji,rbOn,rbThresh,curAlloc,curPS){
   const rows=[];
   {const m=calcMetrics(curPS,dates);rows.push({name:'現在',alloc:curAlloc,metrics:m,rbCnt:lastRBLog.length,color:'#00c8f8'});}
   active.forEach((p,i)=>{
-    const{series:ss,rbLog:rl}=portSeries(ti,si,gi,ji,p.alloc,rbOn,rbThresh,rbMode,dates);
+    const{series:ss,rbLog:rl}=portSeries(ti,si,gi,ji,ui,p.alloc,rbOn,rbThresh,rbMode,dates);
     const m=calcMetrics(ss,dates);
     rows.push({name:p.name,alloc:p.alloc,metrics:m,rbCnt:rl.length,color:p.color});
   });
@@ -1088,13 +1146,55 @@ function renderRBHistory(rbLog,rbOn,alloc){
     </tr>`).join('');
 }
 
+// Instant metric switch — re-render from cached raw metrics, no re-simulation
+function onHmMetricChange(){
+  if(!_hmRawMetrics){
+    // 未実行の場合は何もしない（ボタンで実行してください）
+    return;
+  }
+  // 配分が変わっていたらキャッシュを無効化して再実行を促す
+  const curAlloc = hmGetAlloc();
+  if(_hmAlloc && JSON.stringify(curAlloc)!==JSON.stringify(_hmAlloc)){
+    _hmRawMetrics = null;
+    showErr('配分が変更されました。再度「実行」ボタンを押してください。');
+    return;
+  }
+  const metricKey = document.getElementById('hm-metric').value;
+  const results = buildHmResults(_hmRawMetrics, metricKey);
+  renderHeatmap(results, metricKey, 'avg');
+}
+
+// _hmRawMetrics から指定指標のresultsオブジェクトを生成
+function buildHmResults(rawMetrics, metricKey){
+  const results = {};
+  for(const ym of Object.keys(rawMetrics)){
+    const m = rawMetrics[ym];
+    if(!m){ results[ym]=null; continue; }
+    let val;
+    if(metricKey==='cagr')     val = m.cagr * 100;
+    else if(metricKey==='dd')  val = -(m.dd  * 100);   // negate: green = small DD
+    else if(metricKey==='neg') val = -(m.neg);          // negate: green = few days
+    else if(metricKey==='calmar'){
+      val = m.dd > 0.001 ? m.cagr / m.dd : (m.cagr >= 0 ? 99 : -99);
+    }
+    else if(metricKey==='sharpe'){
+      val = m.vol > 0.001 ? m.cagr / m.vol : (m.cagr >= 0 ? 99 : -99);
+    }
+    else {
+      val = 0; // fallback
+    }
+    results[ym] = isFinite(val) ? val : 0;
+  }
+  return results;
+}
+
 // ═══════════════════════════════════════════════════
 //  HEATMAP: all-period simulation
 // ═══════════════════════════════════════════════════
 async function runHeatmap(){
   clearErr();
   const a=hmGetAlloc();
-  if(a.t+a.s+a.g+a.j!==100){showErr('配分合計が100%ではありません（全期間モードの配分スライダーで設定してください）');return;}
+  if(allocTotal(a)!==100){showErr('配分合計が100%ではありません（全期間モードの配分スライダーで設定してください）');return;}
   if(!raw.topix||!raw.sp||!raw.gold||!raw.usdjpy){showErr('4つのCSVをインポートしてください');return;}
 
   busy=true;
@@ -1121,56 +1221,58 @@ async function runHeatmap(){
   // and slice them with typed-array views instead of rebuilding each time.
 
   // Pre-build full index arrays once (base = allDates[0])
-  const fullIdx = buildIdx(allDates); // {ti,si,gi,ji}
-  const {ti:FT,si:FS,gi:FG,ji:FJ} = fullIdx;
+  const fullIdx = buildIdx(allDates);
+  const {ti:FT, si:FS, gi:FG, ji:FJ, ui:FU} = fullIdx;
+  const hasJGB  = FJ[0] !== null;
+  const hasUSTB2 = FU[0] !== null;
 
-  // Accumulator: ymKey → {sum, count}
+  // Accumulators: ymKey → {cagr, dd, neg, count}
+  // 全指標を同時に集計することで、指標切替時の再シミュレーションを不要にする
   const acc = {};
-
-  // How many start dates have enough data (need >=22 points after start)
   const maxStart = N - 22;
 
   for(let i=0; i<=maxStart; i++){
-    // Slice pre-built index arrays from position i onward
-    // (typed array .slice() is O(k) but avoids re-parsing dates)
-    const ti2 = FT.slice ? FT.slice(i) : FT.slice(i);
-    const si2 = FS.slice(i);
-    const gi2 = FG.slice(i);
-    // FJ may be array of nulls or Float64Array depending on JGB presence
-    const ji2 = FJ[0]!==null ? (FJ.slice ? FJ.slice(i) : Array.from(FJ).slice(i)) : FJ.slice(i);
-
-    // Re-base each index so value at position 0 = 100
-    // (buildIdx already normalises to base 100 at allDates[0], not at i)
-    // So we need to re-normalise: divide every element by element[0]×0.01
-    const base_t = ti2[0]/100, base_s = si2[0]/100, base_g = gi2[0]/100;
-    const base_j = (FJ[0]!==null) ? ji2[0]/100 : 1;
-    const n2 = ti2.length;
-    const ti3=new Float64Array(n2), si3=new Float64Array(n2);
-    const gi3=new Float64Array(n2), ji3= FJ[0]!==null ? new Float64Array(n2) : null;
-    for(let k=0;k<n2;k++){
-      ti3[k]=ti2[k]/base_t; si3[k]=si2[k]/base_s; gi3[k]=gi2[k]/base_g;
-      if(ji3) ji3[k]=ji2[k]/base_j;
+    // Re-base index arrays from position i (start=100)
+    const n2 = N - i;
+    const ti3=new Float64Array(n2), si3=new Float64Array(n2), gi3=new Float64Array(n2);
+    const base_t=FT[i]/100, base_s=FS[i]/100, base_g=FG[i]/100;
+    const base_j=hasJGB ? FJ[i]/100 : 1;
+    let ji3null;
+    if(hasJGB){
+      const ji3=new Float64Array(n2);
+      for(let k=0;k<n2;k++){
+        ti3[k]=FT[i+k]/base_t; si3[k]=FS[i+k]/base_s;
+        gi3[k]=FG[i+k]/base_g; ji3[k]=FJ[i+k]/base_j;
+      }
+      ji3null=Array.from(ji3);
+    } else {
+      for(let k=0;k<n2;k++){
+        ti3[k]=FT[i+k]/base_t; si3[k]=FS[i+k]/base_s; gi3[k]=FG[i+k]/base_g;
+      }
+      ji3null=new Array(n2).fill(null);
     }
-    const dates2 = allDates.slice(i); // string slice — lightweight reference
-    const ji3null = ji3 ? Array.from(ji3) : dates2.map(()=>null);
-
-    const{series:ps}=portSeries(ti3,si3,gi3,ji3null,a,rbOn,rbThresh,rbMode,dates2);
+    let ui3null;
+    if(hasUSTB2){
+      const ui3=new Float64Array(n2);
+      const base_u=FU[i]/100;
+      for(let k=0;k<n2;k++) ui3[k]=FU[i+k]/base_u;
+      ui3null=Array.from(ui3);
+    } else { ui3null=new Array(n2).fill(null); }
+    const dates2 = allDates.slice(i);
+    const{series:ps}=portSeries(ti3,si3,gi3,ji3null,ui3null,a,rbOn,rbThresh,rbMode,dates2);
     const m=calcMetrics(ps,dates2);
 
-    let val;
-    if(metricKey==='cagr')     val = m.cagr*100;
-    else if(metricKey==='dd')  val = -m.maxDD*100;   // negate: green = small DD = good
-    else if(metricKey==='neg') val = -m.negDays;      // negate: green = few negative days = good
-    else                       val = m.maxDD>0.001 ? m.cagr/m.maxDD : (m.cagr>=0?999:-999);
-
-    if(!isFinite(val)) val=0;
-
     const ym = allDates[i].slice(0,7);
-    if(!acc[ym]) acc[ym]={sum:0,count:0};
-    acc[ym].sum += val;
+    if(!acc[ym]) acc[ym]={cagr:0, dd:0, neg:0, vol:0, count:0};
+    if(!datesByYM) var datesByYM={};
+    if(!datesByYM[ym]) datesByYM[ym]=[];
+    datesByYM[ym].push(i);
+    acc[ym].cagr += isFinite(m.cagr)   ? m.cagr   : 0;
+    acc[ym].dd   += isFinite(m.maxDD)  ? m.maxDD  : 0;
+    acc[ym].neg  += isFinite(m.negDays)? m.negDays : 0;
+    acc[ym].vol  += isFinite(m.vol)    ? m.vol     : 0;
     acc[ym].count++;
 
-    // Yield to UI every 50 iterations
     if(i%50===0){
       const pct=Math.round((i+1)/(maxStart+1)*100);
       document.getElementById('prog-fill').style.width=pct+'%';
@@ -1180,23 +1282,39 @@ async function runHeatmap(){
     }
   }
 
-  // Convert accumulators to averages
-  const results={};
+  // 月ごとの平均指標を計算してキャッシュに保存
+  _hmDatesByYM = datesByYM||{};
+  const rawMetrics={};
   for(const ym of Object.keys(acc)){
-    results[ym] = acc[ym].count>0 ? acc[ym].sum/acc[ym].count : null;
+    const a2=acc[ym];
+    rawMetrics[ym] = a2.count>0 ? {
+      cagr: a2.cagr/a2.count,
+      dd:   a2.dd  /a2.count,
+      neg:  a2.neg /a2.count,
+      vol:  a2.vol /a2.count
+    } : null;
   }
 
   busy=false;
   document.getElementById('run-btn').disabled=false;
   document.getElementById('progress-wrap').classList.remove('show');
 
-  renderHeatmap(results,metricKey,'avg');
+  // キャッシュ保存（以降の指標切替は再シミュレーション不要）
+  _hmRawMetrics = rawMetrics;
+  _hmAlloc = {...a};
+
+  // ヒートマップ表示時: opt-resultとiter-cardを非表示に
+  document.getElementById('opt-result').classList.remove('show');
+  document.getElementById('iter-card').classList.remove('show');
+
+  const results = buildHmResults(rawMetrics, metricKey);
+  renderHeatmap(results, metricKey, 'avg');
 }
 
 function renderHeatmap(results,metricKey,mode){
   const card=document.getElementById('heatmap-card');
   card.classList.add('show');
-  const metricLabels={cagr:'CAGR年率(%) 月平均',dd:'最大DD(%) 月平均（緑=小）',neg:'元本割れ日数 月平均（緑=少）',calmar:'Calmar比率 月平均'};
+  const metricLabels={cagr:'CAGR年率(%) 月平均',dd:'最大DD(%) 月平均（緑=小）',neg:'元本割れ日数 月平均（緑=少）',calmar:'Calmar比率 月平均',sharpe:'Sharpe比率 月平均'};
   const modeLabel = mode==='avg' ? '全営業日始まりの月平均' : '各月初日始まり';
   document.getElementById('hm-subtitle').textContent=metricLabels[metricKey]+' | '+modeLabel;
 
@@ -1226,22 +1344,23 @@ function renderHeatmap(results,metricKey,mode){
   html+=`</tr>`;
 
   for(const yr of years){
-    html+=`<tr><td style="color:var(--muted);padding:2px 6px;font-weight:600;font-family:'JetBrains Mono',monospace;white-space:nowrap">${yr}</td>`;
+    html+=`<tr><td style="color:var(--muted);padding:2px 6px;font-weight:600;font-family:'JetBrains Mono',monospace;white-space:nowrap;cursor:pointer;" title="${yr}年全月平均" onclick="showHmDetailYear('${yr}')">${yr}</td>`;
     for(const mo of months){
       const ym=`${yr}-${mo}`;
-      const val=results[ym];
+      const val = (results[ym] !== undefined && results[ym] !== null) ? results[ym] : null;
       const bg=colorForVal(val);
       // Display: DD and neg were negated for color scaling → show absolute value
       let dispTxt='';
-      if(val!==null){
-        if(metricKey==='dd')       dispTxt=(-val).toFixed(1);  // stored as -DD, show DD
-        else if(metricKey==='neg') dispTxt=(-val).toFixed(0);  // stored as -neg, show neg
+      if(val !== null){
+        if(metricKey==='dd')       dispTxt=(-val).toFixed(1);
+        else if(metricKey==='neg') dispTxt=Math.round(-val).toString();
         else                       dispTxt=val.toFixed(2);
       }
       const txt=dispTxt;
       const textColor=val!==null?(Math.abs(val-vmin)/(vmax-vmin||1)>0.3?'#fff':'#111'):'var(--muted)';
       const title=val!==null?`${ym}: ${txt} (${metricKey==='dd'||metricKey==='neg'?'月平均(絶対値)':'月平均'})`:'データなし';
-      html+=`<td style="background:${bg};border-radius:4px;width:52px;height:28px;text-align:center;color:${textColor};font-family:'JetBrains Mono',monospace;cursor:default;" title="${title}">${txt}</td>`;
+      const clickable = val!==null;
+      html+=`<td style="background:${bg};border-radius:4px;width:52px;height:28px;text-align:center;color:${textColor};font-family:'JetBrains Mono',monospace;cursor:${clickable?'pointer':'default'};" title="${title}" ${clickable?`onclick="showHmDetail('${ym}')"`:''}>${txt}</td>`;
     }
     html+=`</tr>`;
   }
@@ -1258,6 +1377,123 @@ function renderHeatmap(results,metricKey,mode){
   container.innerHTML=html;
 }
 
+// ── Heatmap detail: 月・年クリック時の推移グラフ ──
+function showHmDetail(ym){
+  if(!_hmDatesByYM||!_hmDatesByYM[ym]||!_hmAlloc) return;
+  const a=_hmAlloc;
+  const allDates=_commonDatesSorted;
+  const rbOn=document.getElementById('rb-toggle').checked;
+  const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
+  // この月の全開始日の平均系列を計算
+  const idxArr=_hmDatesByYM[ym];
+  const seriesArr=[];
+  const fullIdx=buildIdx(allDates);
+  const{ti:FT,si:FS,gi:FG,ji:FJ,ui:FU}=fullIdx;
+  const hasJGB2=FJ[0]!==null, hasUSTB2=FU[0]!==null;
+  const minLen=22;
+  for(const si2 of idxArr){
+    const n2=allDates.length-si2;
+    if(n2<minLen) continue;
+    const ti3=new Float64Array(n2),si3=new Float64Array(n2),gi3=new Float64Array(n2);
+    const bt=FT[si2]/100,bs=FS[si2]/100,bg=FG[si2]/100;
+    let ji3null,ui3null;
+    if(hasJGB2){const bj=FJ[si2]/100,j3=new Float64Array(n2);for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;j3[k]=FJ[si2+k]/bj;}ji3null=Array.from(j3);}
+    else{for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;}ji3null=new Array(n2).fill(null);}
+    if(hasUSTB2){const bu=FU[si2]/100,u3=new Float64Array(n2);for(let k=0;k<n2;k++)u3[k]=FU[si2+k]/bu;ui3null=Array.from(u3);}
+    else ui3null=new Array(n2).fill(null);
+    const dates2=allDates.slice(si2);
+    const{series:ps}=portSeries(ti3,si3,gi3,ji3null,ui3null,a,rbOn,rbThresh,rbMode,dates2);
+    seriesArr.push(ps);
+  }
+  if(!seriesArr.length) return;
+  // 全系列の長さを最大共通長で揃えてインデックスごとの平均を計算
+  const maxL=Math.max(...seriesArr.map(s=>s.length));
+  // 年月ラベル（相対: 開始から経過月数）
+  const avgSeries=[];
+  for(let k=0;k<maxL;k++){
+    let sum=0,cnt=0;
+    for(const s of seriesArr){if(k<s.length){sum+=s[k];cnt++;}}
+    if(cnt>0) avgSeries.push(sum/cnt);
+  }
+  // x軸: 日数
+  const labels=avgSeries.map((_,k)=>k===0?'0':(k%60===0?(k/5|0)+'w':''));
+  drawHmDetailChart(avgSeries, labels, ym+'月 平均推移 ('+idxArr.length+'開始日の平均)');
+}
+
+function showHmDetailYear(yr){
+  // その年の全月を結合して平均
+  if(!_hmDatesByYM||!_hmAlloc) return;
+  const yms=Object.keys(_hmDatesByYM).filter(ym=>ym.startsWith(yr));
+  if(!yms.length) return;
+  // 各月の平均系列を取得して全体平均
+  const allSeries=[];
+  const allDates=_commonDatesSorted;
+  const rbOn=document.getElementById('rb-toggle').checked;
+  const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
+  const fullIdx=buildIdx(allDates);
+  const{ti:FT,si:FS,gi:FG,ji:FJ,ui:FU}=fullIdx;
+  const hasJGB2=FJ[0]!==null,hasUSTB2=FU[0]!==null;
+  for(const ym of yms){
+    for(const si2 of (_hmDatesByYM[ym]||[])){
+      const n2=allDates.length-si2; if(n2<22) continue;
+      const ti3=new Float64Array(n2),si3=new Float64Array(n2),gi3=new Float64Array(n2);
+      const bt=FT[si2]/100,bs=FS[si2]/100,bg=FG[si2]/100;
+      let ji3null,ui3null;
+      if(hasJGB2){const bj=FJ[si2]/100,j3=new Float64Array(n2);for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;j3[k]=FJ[si2+k]/bj;}ji3null=Array.from(j3);}
+      else{for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;}ji3null=new Array(n2).fill(null);}
+      if(hasUSTB2){const bu=FU[si2]/100,u3=new Float64Array(n2);for(let k=0;k<n2;k++)u3[k]=FU[si2+k]/bu;ui3null=Array.from(u3);}
+      else ui3null=new Array(n2).fill(null);
+      const dates2=allDates.slice(si2);
+      const{series:ps}=portSeries(ti3,si3,gi3,ji3null,ui3null,_hmAlloc,rbOn,rbThresh,rbMode,dates2);
+      allSeries.push(ps);
+    }
+  }
+  if(!allSeries.length) return;
+  const maxL=Math.max(...allSeries.map(s=>s.length));
+  const avgSeries=[];
+  for(let k=0;k<maxL;k++){
+    let sum=0,cnt=0;
+    for(const s of allSeries){if(k<s.length){sum+=s[k];cnt++;}}
+    if(cnt>0) avgSeries.push(sum/cnt);
+  }
+  const labels=avgSeries.map((_,k)=>k===0?'0':(k%60===0?(k/5|0)+'w':''));
+  drawHmDetailChart(avgSeries, labels, yr+'年 平均推移 ('+allSeries.length+'開始日の平均)');
+}
+
+function drawHmDetailChart(series, labels, title){
+  const card=document.getElementById('hm-detail-card');
+  card.style.display='';
+  document.getElementById('hm-detail-title').textContent='📈 '+title;
+  if(hmDetailChartInst) hmDetailChartInst.destroy();
+  const canvas=document.getElementById('hm-detail-chart');
+  hmDetailChartInst=new Chart(canvas,{
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        label:'平均評価額',data:series,
+        borderColor:'rgba(245,158,11,0.9)',backgroundColor:'rgba(245,158,11,0.08)',
+        borderWidth:2,pointRadius:0,fill:true,tension:0.3
+      },{
+        label:'元本(100)',
+        data:series.map(()=>100),
+        borderColor:'rgba(255,255,255,0.15)',borderDash:[4,4],
+        borderWidth:1,pointRadius:0,fill:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:300},
+      scales:{
+        x:{ticks:{color:'#4b6484',maxTicksLimit:12,font:{size:10}},grid:{color:'rgba(30,48,80,.5)'}},
+        y:{ticks:{color:'#4b6484',font:{size:10}},grid:{color:'rgba(30,48,80,.5)'}}
+      },
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}},tooltip:{mode:'index',intersect:false}}
+    }
+  });
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
 // ═══════════════════════════════════════════════════
 //  OPTIMIZATION ENGINE
 //  Strategy: 3-phase random search on integer allocation space
@@ -1271,54 +1507,86 @@ function ncdf(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2
 function npdf(z){return Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);}
 
 // Generate a random valid allocation within [mn,mx] per asset, summing to 100
-function rand4(mn, mx, useJ, center, spread){
-  // center: {t,s,g,j} optional — if given, sample near it within ±spread
-  const nAssets = useJ ? 4 : 3;
-  for(let attempt=0; attempt<800; attempt++){
-    let t,s,g,j=0;
-    if(center && spread){
-      // Perturb each dimension by ±spread, then re-normalise to 100
-      const perturbedT = Math.round(center.t + (Math.random()*2-1)*spread);
-      const perturbedS = Math.round(center.s + (Math.random()*2-1)*spread);
-      const perturbedG = Math.round(center.g + (Math.random()*2-1)*spread);
-      const perturbedJ = useJ ? Math.round(center.j + (Math.random()*2-1)*spread) : 0;
-      // Clamp to [mn,mx]
-      t = Math.max(mn, Math.min(mx, perturbedT));
-      s = Math.max(mn, Math.min(mx, perturbedS));
-      g = Math.max(mn, Math.min(mx, perturbedG));
-      j = useJ ? Math.max(mn, Math.min(mx, perturbedJ)) : 0;
-      // Re-normalise to 100 by scaling
-      const total = t+s+g+j;
-      if(total===0) continue;
-      t=Math.round(t/total*100); s=Math.round(s/total*100);
-      g=Math.round(g/total*100); j=useJ?100-t-s-g:0;
-      if(t<mn||t>mx||s<mn||s>mx||g<mn||g>mx) continue;
-      if(useJ&&(j<mn||j>mx)) continue;
-      if(t+s+g+(useJ?j:0)!==100) continue;
+function rand5(mn, mx, useJ, useU, center, spread){
+  // 3〜5資産、合計100%の整数配分を生成
+  const nA = 3 + (useJ?1:0) + (useU?1:0);
+  for(let attempt=0;attempt<1200;attempt++){
+    let t,s,g,j=0,u=0;
+    if(center && spread>0){
+      // 中心点から±spreadで摂動して再正規化
+      const raw_t=Math.max(mn,Math.min(mx,Math.round(center.t+(Math.random()*2-1)*spread)));
+      const raw_s=Math.max(mn,Math.min(mx,Math.round(center.s+(Math.random()*2-1)*spread)));
+      const raw_g=Math.max(mn,Math.min(mx,Math.round(center.g+(Math.random()*2-1)*spread)));
+      const raw_j=useJ?Math.max(mn,Math.min(mx,Math.round((center.j||0)+(Math.random()*2-1)*spread))):0;
+      const raw_u=useU?Math.max(mn,Math.min(mx,Math.round((center.u||0)+(Math.random()*2-1)*spread))):0;
+      const tot=raw_t+raw_s+raw_g+raw_j+raw_u; if(tot===0)continue;
+      t=Math.round(raw_t/tot*100);s=Math.round(raw_s/tot*100);g=Math.round(raw_g/tot*100);
+      j=useJ?Math.round(raw_j/tot*100):0;
+      u=useU?100-t-s-g-j:0;
+      if(!useU&&!useJ&&t+s+g!==100)u=0,j=0,g=100-t-s;
+      if(!useU&&useJ) j=100-t-s-g;
+      if(t<mn||t>mx||s<mn||s>mx||g<mn||g>mx)continue;
+      if(useJ&&(j<mn||j>mx))continue;
+      if(useU&&(u<mn||u>mx))continue;
+      if(t+s+g+j+u!==100)continue;
     } else {
-      // Pure uniform random
-      t = Math.round(mn + Math.random()*(mx-mn));
-      const sm = Math.min(mx, 100-t-mn*(nAssets-1));
-      if(sm < mn) continue;
-      s = Math.round(mn + Math.random()*(sm-mn));
-      const gm = Math.min(mx, 100-t-s-mn*(nAssets-2));
-      if(gm < mn) continue;
-      g = Math.round(mn + Math.random()*(gm-mn));
-      j = useJ ? 100-t-s-g : 0;
-      if(!useJ && t+s+g!==100) continue;
-      if(useJ&&(j<mn||j>mx)) continue;
+      t=Math.round(mn+Math.random()*(mx-mn));
+      {const rem=100-t-mn*(nA-1);if(rem<0)continue;const m2=Math.min(mx,t+rem-mn*(nA-2));if(m2<mn)continue;s=Math.round(mn+Math.random()*(m2-mn));}
+      {const rem=100-t-s-mn*(nA-2);if(rem<0)continue;const m2=Math.min(mx,rem);if(m2<mn)continue;g=Math.round(mn+Math.random()*(m2-mn));}
+      if(useJ&&useU){
+        const rem=100-t-s-g-mn;if(rem<mn||rem>mx)continue;
+        j=Math.round(mn+Math.random()*Math.min(mx-mn,rem-mn));
+        u=100-t-s-g-j;if(u<mn||u>mx)continue;
+      } else if(useJ){j=100-t-s-g;if(j<mn||j>mx)continue;}
+      else if(useU){u=100-t-s-g;if(u<mn||u>mx)continue;}
+      else{if(t+s+g!==100)continue;}
     }
-    return {t,s,g,j};
+    return{t,s,g,j,u};
   }
   return null;
 }
 
-function objScore(ti,si,gi,ji,alloc,objKey,dates,rbOn,rbThresh){
-  const{series:s}=portSeries(ti,si,gi,ji,alloc,rbOn,rbThresh,rbMode,dates);
+function objScore(ti,si,gi,ji,ui,alloc,objKey,dates,rbOn,rbThresh){
+  const{series:s}=portSeries(ti,si,gi,ji,ui,alloc,rbOn,rbThresh,rbMode,dates);
   const{maxDD,cagr,vol}=calcMetrics(s,dates);
-  if(objKey==='calmar') return maxDD>0.0001 ? cagr/maxDD : (cagr>0?cagr*100:-100);
-  if(objKey==='sharpe')  return vol>0.0001  ? cagr/vol  : (cagr>0?cagr*100:-100);
-  return cagr;
+  // 指標を%単位に変換（スケール統一）
+  const C=cagr*100;   // 年率リターン(%) 例: 8.0
+  const D=maxDD*100;  // 最大DD(%)       例: 20.0
+  const V=vol*100;    // 年率ボラ(%)     例: 15.0
+
+  // ── バランス型（推奨）──
+  // リターン重視しつつDDとボラにペナルティ。
+  // 国債100%はC≈0〜1%, D≈0, V≈1% → score≈0-0-5=-5 (低い)
+  // S&P寄りはC≈10%, D≈20%, V≈15% → score≈10-10-7.5=-7.5 (中)
+  // バランス型はC≈7%, D≈10%, V≈8% → score≈7-5-4=−2 (最良)
+  if(objKey==='balanced'){
+    // CAGR 2%未満は強制ペナルティ（国債・低リターン逃げを防ぐ）
+    if(C < 2.0) return -30 + C;
+    // リターン重視、DD・ボラを半減ペナルティ
+    return C - D*0.5 - V*0.3;
+  }
+
+  // ── リターン/リスク比（改善Calmar）──
+  // CAGRをDDで割るが、CAGR<1%の場合に大ペナルティ → 低リターン高安全逃げを防ぐ
+  if(objKey==='calmar_floor'){
+    if(C<1.0) return C - 50;  // 年率1%未満は強制ペナルティ
+    return D>0.1 ? C/D : C*10;
+  }
+
+  // ── リスク調整リターン（改善Sharpe）──
+  if(objKey==='sharpe_floor'){
+    if(C<1.0) return C - 50;
+    return V>0.1 ? C/V : C*10;
+  }
+
+  // ── 純粋Calmar ──
+  if(objKey==='calmar') return D>0.1?C/D:(C>0?C*10:-100);
+
+  // ── 純粋Sharpe ──
+  if(objKey==='sharpe') return V>0.1?C/V:(C>0?C*10:-100);
+
+  // ── 最大リターン ──
+  return C;
 }
 
 async function runOpt(){
@@ -1328,17 +1596,19 @@ async function runOpt(){
   if(!sd){showErr('開始日を選択してください');return;}
   const dates=getDates(sd);
   if(dates.length<10){showErr('データ不足');return;}
-  const{ti,si,gi,ji}=buildIdx(dates);
+  const{ti,si,gi,ji,ui}=buildIdx(dates);
 
   const objKey = document.getElementById('opt-obj').value;
   const iters  = Math.min(500, Math.max(20, parseInt(document.getElementById('opt-iters').value)||80));
   const mn     = Math.max(0,   parseInt(document.getElementById('opt-min').value)||0);
   const mx     = Math.min(100, parseInt(document.getElementById('opt-max').value)||100);
   const useJ   = raw.jgb !== null;
+  const useU   = raw.ustb !== null;
   const rbOn   = document.getElementById('rb-toggle').checked;
   const rbThresh = parseFloat(document.getElementById('rb-threshold').value)||5;
 
-  if(mn*(useJ?4:3) > 100){showErr('最小配分の合計が100%を超えています');return;}
+  const nAssets=3+(useJ?1:0)+(useU?1:0);
+  if(mn*nAssets>100){showErr('最小配分の合計が100%を超えています');return;}
 
   busy=true;
   document.getElementById('run-btn').disabled=true;
@@ -1356,17 +1626,17 @@ async function runOpt(){
     let pt;
     if(it < ph1End){
       // Phase 1: pure uniform random
-      pt = rand4(mn, mx, useJ);
+      pt = rand5(mn, mx, useJ, useU);
     } else if(it < ph2End){
       // Phase 2: perturb best ±12%, fallback to random
-      pt = (bestPt ? rand4(mn, mx, useJ, bestPt, 12) : null) || rand4(mn, mx, useJ);
+      pt = (bestPt ? rand5(mn, mx, useJ, useU, bestPt, 12) : null) || rand5(mn, mx, useJ, useU);
     } else {
       // Phase 3: tight refinement ±4%
-      pt = (bestPt ? rand4(mn, mx, useJ, bestPt, 4) : null) || rand4(mn, mx, useJ);
+      pt = (bestPt ? rand5(mn, mx, useJ, useU, bestPt, 4) : null) || rand5(mn, mx, useJ, useU);
     }
     if(!pt){ hS.push(bestScore===-Infinity?null:bestScore); hB.push(bestScore===-Infinity?null:bestScore); continue; }
 
-    const sc = objScore(ti,si,gi,ji,pt,objKey,dates,rbOn,rbThresh);
+    const sc = objScore(ti,si,gi,ji,ui,pt,objKey,dates,rbOn,rbThresh);
     hS.push(isFinite(sc)?sc:null);
     if(isFinite(sc) && sc > bestScore){ bestScore=sc; bestPt={...pt}; }
     hB.push(bestScore===-Infinity?null:bestScore);
@@ -1382,17 +1652,22 @@ async function runOpt(){
   if(!bestPt){showErr('有効な配分が見つかりませんでした');return;}
 
   // Show results
-  const objLbls={calmar:'Calmar比率',sharpe:'Sharpe比率',return:'CAGR年率'};
+  const objLbls={balanced:'バランス型スコア',calmar_floor:'Calmar+下限',sharpe_floor:'Sharpe+下限',calmar:'Calmar比率',sharpe:'Sharpe比率',return:'CAGR年率'};
   document.getElementById('oav-topix').textContent = bestPt.t+'%';
   document.getElementById('oav-sp').textContent    = bestPt.s+'%';
   document.getElementById('oav-gold').textContent  = bestPt.g+'%';
   document.getElementById('oav-jgb').textContent   = useJ ? bestPt.j+'%' : '—';
+  if(document.getElementById('oav-ustb-item'))
+    document.getElementById('oav-ustb-item').style.display = useU ? '' : 'none';
+  if(document.getElementById('oav-ustb'))
+    document.getElementById('oav-ustb').textContent  = useU ? (bestPt.u||0)+'%' : '—';
   document.getElementById('osr-label').textContent = objLbls[objKey];
   document.getElementById('osr-val').textContent   = objKey==='return'
     ? (bestScore*100).toFixed(2)+'%' : bestScore.toFixed(3);
   document.getElementById('osr-iter').textContent  = '試行: '+hS.length+'回';
 
   // Run simulation with best allocation (pass flag to preserve opt-result display)
+  document.getElementById('heatmap-card').classList.remove('show');
   runSim(bestPt, true);
 
   // Show opt-result and iter-chart AFTER runSim (runSim may update DOM)
@@ -1404,7 +1679,7 @@ function updProg(cur,tot,best,obj){
   const pct=Math.round(cur/tot*100);
   document.getElementById('prog-fill').style.width=pct+'%';
   document.getElementById('prog-pct').textContent=pct+'%';
-  const lbl={calmar:'Calmar',sharpe:'Sharpe',return:'CAGR'};
+  const lbl={balanced:'バランス',calmar_floor:'Calmar+下限',sharpe_floor:'Sharpe+下限',calmar:'Calmar',sharpe:'Sharpe',return:'CAGR'};
   const sv=best===-Infinity?'—':(obj==='return'?(best*100).toFixed(1)+'%':best.toFixed(3));
   document.getElementById('prog-text').textContent=`最適化中 ${cur}/${tot} | Best ${lbl[obj]}: ${sv}`;
 }
