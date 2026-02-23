@@ -172,7 +172,7 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
 .leg-item{display:flex;align-items:center;gap:.25rem;font-size:.65rem;color:var(--text2);cursor:pointer;transition:opacity .15s;user-select:none;}
 .leg-item.hidden{opacity:.3;}
 .leg-line{width:13px;height:2px;border-radius:1px;flex-shrink:0;}
-.chart-wrap{position:relative;}
+.chart-wrap{position:relative;}.chart-wrap.main-wrap{height:clamp(260px,45vh,520px);}
 /* Opt Result */
 .opt-result{background:var(--surface);border:1px solid rgba(244,114,182,.3);border-radius:10px;padding:.85rem 1rem;display:none;}
 .opt-result.show{display:block;}
@@ -273,7 +273,6 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
     <div class="sec-label">② モード</div>
     <div class="tab-bar">
       <button class="tab-btn active t-manual" id="tab-manual" onclick="setMode('manual')">✦ マニュアル</button>
-      <button class="tab-btn" id="tab-opt" onclick="setMode('optimize')">⚡ 最適化</button>
       <button class="tab-btn" id="tab-hm" onclick="setMode('heatmap')">🌡 全期間</button>
     </div>
   </div>
@@ -297,36 +296,17 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
           <input class="num-in" id="n-gold" type="number" min="0" max="100" value="15" oninput="syncNum('gold')"></div>
         <input type="range" class="rg" id="sl-gold" min="0" max="100" value="15" oninput="syncSl('gold')">
       </div>
-      <div class="alloc-row" id="row-jgb" style="display:none">
+      <div class="alloc-row" id="row-jgb">
         <div class="alloc-rh"><div class="alloc-name"><span class="dot dj"></span>日本国債</div>
-          <input class="num-in" id="n-jgb" type="number" min="0" max="100" value="10" oninput="syncNum('jgb')"></div>
-        <input type="range" class="rj" id="sl-jgb" min="0" max="100" value="10" oninput="syncSl('jgb')">
+          <input class="num-in" id="n-jgb" type="number" min="0" max="100" value="0" oninput="syncNum('jgb')"></div>
+        <input type="range" class="rj" id="sl-jgb" min="0" max="100" value="0" oninput="syncSl('jgb')">
       </div>
-      <div class="alloc-row" id="row-ustb" style="display:none">
+      <div class="alloc-row" id="row-ustb">
         <div class="alloc-rh"><div class="alloc-name"><span class="dot du"></span>米国債</div>
           <input class="num-in" id="n-ustb" type="number" min="0" max="100" value="0" oninput="syncNum('ustb')"></div>
         <input type="range" class="ru" id="sl-ustb" min="0" max="100" value="0" oninput="syncSl('ustb')">
       </div>
       <div class="total-bar"><span>合計</span><span class="tv ok" id="total-disp">100%</span></div>
-    </div>
-  </div>
-
-  <!-- ③ Opt settings -->
-  <div id="sec-opt" style="display:none">
-    <div class="sec-label">③ 最適化設定</div>
-    <div class="opt-settings">
-      <div class="opt-row"><span class="opt-label">目的関数</span>
-        <select class="opt-select" id="opt-obj">
-          <option value="balanced">バランス型（推奨）</option>
-          <option value="calmar_floor">Calmar+下限付き</option>
-          <option value="sharpe_floor">Sharpe+下限付き</option>
-          <option value="calmar">Calmar (CAGR/MaxDD)</option>
-          <option value="sharpe">Sharpe (CAGR/Vol)</option>
-          <option value="return">最大リターン</option>
-        </select></div>
-      <div class="opt-row"><span class="opt-label">試行回数</span><input type="number" class="opt-num" id="opt-iters" value="80" min="20" max="300"></div>
-      <div class="opt-row"><span class="opt-label">各資産 最小%</span><input type="number" class="opt-num" id="opt-min" value="0" min="0" max="25"></div>
-      <div class="opt-row"><span class="opt-label">各資産 最大%</span><input type="number" class="opt-num" id="opt-max" value="100" min="20" max="100"></div>
     </div>
   </div>
 
@@ -350,12 +330,12 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
           <input class="num-in" id="hm-n-gold" type="number" min="0" max="100" value="25" oninput="hmSyncNum('gold')"></div>
         <input type="range" class="rg" id="hm-sl-gold" min="0" max="100" value="25" oninput="hmSyncSl('gold')">
       </div>
-      <div class="alloc-row" id="hm-row-jgb" style="display:none">
+      <div class="alloc-row" id="hm-row-jgb">
         <div class="alloc-rh"><div class="alloc-name"><span class="dot dj"></span>日本国債</div>
           <input class="num-in" id="hm-n-jgb" type="number" min="0" max="100" value="0" oninput="hmSyncNum('jgb')"></div>
         <input type="range" class="rj" id="hm-sl-jgb" min="0" max="100" value="0" oninput="hmSyncSl('jgb')">
       </div>
-      <div class="alloc-row" id="hm-row-ustb" style="display:none">
+      <div class="alloc-row" id="hm-row-ustb">
         <div class="alloc-rh"><div class="alloc-name"><span class="dot du"></span>米国債</div>
           <input class="num-in" id="hm-n-ustb" type="number" min="0" max="100" value="0" oninput="hmSyncNum('ustb')"></div>
         <input type="range" class="ru" id="hm-sl-ustb" min="0" max="100" value="0" oninput="hmSyncSl('ustb')">
@@ -367,10 +347,8 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
       <div class="opt-row"><span class="opt-label">表示指標</span>
         <select class="opt-select" id="hm-metric" onchange="onHmMetricChange()">
           <option value="cagr">CAGR年率</option>
-          <option value="dd">最大DD</option>
-          <option value="neg">元本割れ日数</option>
-          <option value="calmar">Calmar比率</option>
-          <option value="sharpe">Sharpe比率</option>
+          <option value="totalreturn">トータルリターン</option>
+          <option value="neg">元本割れ期間</option>
         </select></div>
       <p style="font-size:.62rem;color:var(--muted);">全データ期間の各月始まりを開始日としてシミュレーション。月×年のヒートマップで成績分布を表示します。</p>
     </div>
@@ -432,11 +410,7 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
 </aside>
 
 <!-- ════ CONTENT ════ -->
-<main class="content">
-  <!-- Opt result -->
-  <div class="opt-result" id="opt-result">
-    <div class="opt-result-title">⚡ ベイズ最適化 — 最適配分</div>
-    <div class="opt-alloc-grid">
+<main class="content">    <div class="opt-alloc-grid">
       <div class="opt-alloc-item"><div class="oai-name">TOPIX</div><div class="oai-val" id="oav-topix">—</div></div>
       <div class="opt-alloc-item"><div class="oai-name">S&P 500</div><div class="oai-val" id="oav-sp">—</div></div>
       <div class="opt-alloc-item"><div class="oai-name">Gold</div><div class="oai-val" id="oav-gold">—</div></div>
@@ -472,7 +446,7 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
       </div>
     </div>
     <div class="chart-legend" id="main-legend" style="margin-bottom:.6rem;"></div>
-    <div class="chart-wrap" style="height:310px">
+    <div class="chart-wrap main-wrap">
       <div class="placeholder" id="placeholder"><div class="ph-icon">📈</div><p class="ph-text">データをインポートして実行してください</p></div>
       <canvas id="main-chart" style="display:none"></canvas>
     </div>
@@ -519,23 +493,7 @@ input[type=date]:focus{outline:none;border-color:var(--accent);}
     <div id="heatmap-container"></div>
   </div>
 
-  <!-- Heatmap detail chart (shown on cell/row click) -->
-  <div class="chart-card" id="hm-detail-card" style="display:none">
-    <div class="chart-header">
-      <div class="chart-title" style="color:var(--amber)" id="hm-detail-title">月別 平均推移</div>
-      <button onclick="document.getElementById('hm-detail-card').style.display='none'" style="font-size:.65rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:.2rem .5rem;border-radius:4px;border:1px solid var(--border)">✕ 閉じる</button>
-    </div>
-    <div class="chart-wrap" style="height:260px"><canvas id="hm-detail-chart"></canvas></div>
-  </div>
 
-  <!-- Iter chart -->
-  <div class="iter-card" id="iter-card">
-    <div class="chart-header">
-      <div class="chart-title" style="color:var(--opt)">最適化収束履歴</div>
-      <div style="font-size:.65rem;color:var(--muted)">試行スコア（紫）・最良値（ピンク）</div>
-    </div>
-    <div class="chart-wrap" style="height:140px"><canvas id="iter-chart"></canvas></div>
-  </div>
 </main>
 </div>
 
@@ -613,16 +571,13 @@ function normDate(s){
 function setMode(m){
   appMode=m;
   document.getElementById('tab-manual').className='tab-btn'+(m==='manual'?' active t-manual':'');
-  document.getElementById('tab-opt').className='tab-btn'+(m==='optimize'?' active t-opt':'');
   document.getElementById('tab-hm').className='tab-btn'+(m==='heatmap'?' active t-heatmap':'');
   document.getElementById('sec-manual').style.display=m==='manual'?'':'none';
-  document.getElementById('sec-opt').style.display=m==='optimize'?'':'none';
   document.getElementById('sec-hm').style.display=m==='heatmap'?'':'none';
   document.getElementById('sec-saved').style.display=(m==='manual')?'':'none';
   document.getElementById('sec-date').style.display=(m==='heatmap')?'none':'';
   const btn=document.getElementById('run-btn');
   if(m==='manual'){btn.textContent='シミュレーション実行';btn.className='run-btn';}
-  else if(m==='optimize'){btn.textContent='⚡ 最適化開始';btn.className='run-btn opt-mode';}
   else{btn.textContent='🌡 全期間ヒートマップ生成';btn.className='run-btn heatmap-mode';}
 }
 function setRBMode(m){
@@ -648,8 +603,8 @@ function getAlloc(){
     t:parseInt(document.getElementById('n-topix').value)||0,
     s:parseInt(document.getElementById('n-sp').value)||0,
     g:parseInt(document.getElementById('n-gold').value)||0,
-    j:raw.jgb?(parseInt(document.getElementById('n-jgb').value)||0):0,
-    u:raw.ustb?(parseInt(document.getElementById('n-ustb').value)||0):0,
+    j:parseInt(document.getElementById('n-jgb').value)||0,
+    u:parseInt(document.getElementById('n-ustb').value)||0,
   };
 }
 function allocTotal(a){return a.t+a.s+a.g+a.j+a.u;}
@@ -671,8 +626,8 @@ function hmGetAlloc(){
     t:parseInt(document.getElementById('hm-n-topix').value)||0,
     s:parseInt(document.getElementById('hm-n-sp').value)||0,
     g:parseInt(document.getElementById('hm-n-gold').value)||0,
-    j:raw.jgb?(parseInt(document.getElementById('hm-n-jgb').value)||0):0,
-    u:raw.ustb?(parseInt(document.getElementById('hm-n-ustb').value)||0):0,
+    j:parseInt(document.getElementById('hm-n-jgb').value)||0,
+    u:parseInt(document.getElementById('hm-n-ustb').value)||0,
   };
 }
 function hmUpdateTotal(){
@@ -949,12 +904,12 @@ function setPeriodView(v){
 // ═══════════════════════════════════════════════════
 //  DISPATCH
 // ═══════════════════════════════════════════════════
-function onRun(){if(busy)return;if(appMode==='manual')runSim();else if(appMode==='optimize')runOpt();else runHeatmap();}
+function onRun(){if(busy)return;if(appMode==='manual')runSim();else runHeatmap();}
 
 // ═══════════════════════════════════════════════════
 //  MANUAL SIM
 // ═══════════════════════════════════════════════════
-function runSim(overrideAlloc, _fromOpt){
+function runSim(overrideAlloc){
   clearErr();
   const a=overrideAlloc||getAlloc();
   if(!overrideAlloc&&allocTotal(a)!==100){showErr('配分合計が100%ではありません');return;}
@@ -991,7 +946,7 @@ function runSim(overrideAlloc, _fromOpt){
     document.getElementById('m-rb-sub').textContent='リバランスOFF';
   }
 
-  // Build series map
+  // Build series map (reset any heatmap overlay)
   currentDates=dates;
   currentSeries={
     current:{label:'現在の配分',series:ps,color:'rgba(0,200,248,1)',fill:true,colorRGB:'0,200,248'},
@@ -1014,10 +969,6 @@ function runSim(overrideAlloc, _fromOpt){
   redrawMainChart();
   updateCompTable(dates,ti,si,gi,ji,rbOn,rbThresh,a,ps);
   renderRBHistory(rbLog,rbOn,a);
-  if(!_fromOpt){
-    document.getElementById('opt-result').classList.remove('show');
-    document.getElementById('iter-card').classList.remove('show');
-  }
   document.getElementById('heatmap-card').classList.remove('show');
 }
 
@@ -1044,19 +995,38 @@ function redrawMainChart(){
     const sr=currentSeries[key];
     const raw2=sr.series.slice(startIdx,endIdx+1);
     const data=raw2.filter((_,i)=>i%step===0||i===raw2.length-1);
+    const isHmAvg=key==='hmAvg';
     return{
       label:sr.label,data,
       borderColor:sr.color,
       backgroundColor:sr.fill?`rgba(${sr.colorRGB},.07)`:'transparent',
-      borderWidth:sr.fill?2:key.startsWith('saved')?1.5:1,
+      borderWidth:sr.fill?2:isHmAvg?2:key.startsWith('saved')?1.5:1,
       borderDash:sr.dash||[],
       pointRadius:0,fill:sr.fill?'origin':false,tension:0.3,
       order:sr.fill?0:1,
+      spanGaps:isHmAvg,
     };
   });
   document.getElementById('placeholder').style.display='none';
   const canvas=document.getElementById('main-chart');canvas.style.display='block';
   if(mainChartInst)mainChartInst.destroy();
+  // 「現在の配分」系列の値範囲を計算してy軸を中心化
+  const curKey = currentSeries.hmAvg ? 'hmAvg' : 'current';
+  const curData = currentSeries[curKey] ? currentSeries[curKey].series.slice(startIdx,endIdx+1).filter(v=>v!=null) : [];
+  const curMin = curData.length ? Math.min(...curData) : 80;
+  const curMax = curData.length ? Math.max(...curData) : 150;
+  const curMid = (curMin+curMax)/2;
+  const curRange = Math.max(curMax-curMin, 30);
+  // 全データセットの最大・最小も考慮
+  const allVals = datasets.flatMap(ds=>ds.data).filter(v=>v!=null&&isFinite(v));
+  const allMin = allVals.length ? Math.min(...allVals) : curMin;
+  const allMax = allVals.length ? Math.max(...allVals) : curMax;
+  // y軸: 現在配分の中心±(range×0.7)、かつ全データを包含、さらに余白15%
+  const yCenter = curMid;
+  const yHalf = Math.max(curRange*0.7, Math.max(yCenter-allMin, allMax-yCenter)) * 1.15;
+  const yMin = Math.floor(Math.max(0, yCenter-yHalf));
+  const yMax = Math.ceil(yCenter+yHalf);
+
   mainChartInst=new Chart(canvas,{
     type:'line',data:{labels:lbls,datasets},
     options:{
@@ -1070,8 +1040,11 @@ function redrawMainChart(){
       }},
       scales:{
         x:{ticks:{color:'#4b6484',font:{size:9},maxTicksLimit:9},grid:{color:'rgba(30,48,80,.5)'}},
-        y:{ticks:{color:'#4b6484',font:{size:9}},grid:{color:'rgba(30,48,80,.5)'},
-           afterDataLimits:sc=>{sc.min=Math.min(sc.min,95);}}
+        y:{
+          min:yMin,max:yMax,
+          ticks:{color:'#4b6484',font:{size:9}},
+          grid:{color:'rgba(30,48,80,.5)'}
+        }
       }
     }
   });
@@ -1171,18 +1144,10 @@ function buildHmResults(rawMetrics, metricKey){
     const m = rawMetrics[ym];
     if(!m){ results[ym]=null; continue; }
     let val;
-    if(metricKey==='cagr')     val = m.cagr * 100;
-    else if(metricKey==='dd')  val = -(m.dd  * 100);   // negate: green = small DD
-    else if(metricKey==='neg') val = -(m.neg);          // negate: green = few days
-    else if(metricKey==='calmar'){
-      val = m.dd > 0.001 ? m.cagr / m.dd : (m.cagr >= 0 ? 99 : -99);
-    }
-    else if(metricKey==='sharpe'){
-      val = m.vol > 0.001 ? m.cagr / m.vol : (m.cagr >= 0 ? 99 : -99);
-    }
-    else {
-      val = 0; // fallback
-    }
+    if(metricKey==='cagr')             val = m.cagr * 100;
+    else if(metricKey==='totalreturn') val = m.totalreturn;
+    else if(metricKey==='neg')         val = -(m.neg);  // negate: green=few days
+    else val = 0;
     results[ym] = isFinite(val) ? val : 0;
   }
   return results;
@@ -1263,14 +1228,13 @@ async function runHeatmap(){
     const m=calcMetrics(ps,dates2);
 
     const ym = allDates[i].slice(0,7);
-    if(!acc[ym]) acc[ym]={cagr:0, dd:0, neg:0, vol:0, count:0};
+    if(!acc[ym]) acc[ym]={cagr:0, totalreturn:0, neg:0, count:0};
     if(!datesByYM) var datesByYM={};
     if(!datesByYM[ym]) datesByYM[ym]=[];
     datesByYM[ym].push(i);
-    acc[ym].cagr += isFinite(m.cagr)   ? m.cagr   : 0;
-    acc[ym].dd   += isFinite(m.maxDD)  ? m.maxDD  : 0;
-    acc[ym].neg  += isFinite(m.negDays)? m.negDays : 0;
-    acc[ym].vol  += isFinite(m.vol)    ? m.vol     : 0;
+    acc[ym].cagr        += isFinite(m.cagr)    ? m.cagr    : 0;
+    acc[ym].totalreturn += isFinite(m.finalVal) ? m.finalVal-100 : 0;
+    acc[ym].neg         += isFinite(m.negDays)  ? m.negDays  : 0;
     acc[ym].count++;
 
     if(i%50===0){
@@ -1288,10 +1252,9 @@ async function runHeatmap(){
   for(const ym of Object.keys(acc)){
     const a2=acc[ym];
     rawMetrics[ym] = a2.count>0 ? {
-      cagr: a2.cagr/a2.count,
-      dd:   a2.dd  /a2.count,
-      neg:  a2.neg /a2.count,
-      vol:  a2.vol /a2.count
+      cagr:        a2.cagr/a2.count,
+      totalreturn: a2.totalreturn/a2.count,
+      neg:         a2.neg/a2.count
     } : null;
   }
 
@@ -1303,9 +1266,6 @@ async function runHeatmap(){
   _hmRawMetrics = rawMetrics;
   _hmAlloc = {...a};
 
-  // ヒートマップ表示時: opt-resultとiter-cardを非表示に
-  document.getElementById('opt-result').classList.remove('show');
-  document.getElementById('iter-card').classList.remove('show');
 
   const results = buildHmResults(rawMetrics, metricKey);
   renderHeatmap(results, metricKey, 'avg');
@@ -1314,7 +1274,7 @@ async function runHeatmap(){
 function renderHeatmap(results,metricKey,mode){
   const card=document.getElementById('heatmap-card');
   card.classList.add('show');
-  const metricLabels={cagr:'CAGR年率(%) 月平均',dd:'最大DD(%) 月平均（緑=小）',neg:'元本割れ日数 月平均（緑=少）',calmar:'Calmar比率 月平均',sharpe:'Sharpe比率 月平均'};
+  const metricLabels={cagr:'CAGR年率(%) 月平均',totalreturn:'トータルリターン(%) 月平均',neg:'元本割れ期間(日) 月平均（緑=少）'};
   const modeLabel = mode==='avg' ? '全営業日始まりの月平均' : '各月初日始まり';
   document.getElementById('hm-subtitle').textContent=metricLabels[metricKey]+' | '+modeLabel;
 
@@ -1352,13 +1312,12 @@ function renderHeatmap(results,metricKey,mode){
       // Display: DD and neg were negated for color scaling → show absolute value
       let dispTxt='';
       if(val !== null){
-        if(metricKey==='dd')       dispTxt=(-val).toFixed(1);
-        else if(metricKey==='neg') dispTxt=Math.round(-val).toString();
-        else                       dispTxt=val.toFixed(2);
+        if(metricKey==='neg') dispTxt=Math.round(-val).toString();
+        else                  dispTxt=val.toFixed(1);
       }
       const txt=dispTxt;
       const textColor=val!==null?(Math.abs(val-vmin)/(vmax-vmin||1)>0.3?'#fff':'#111'):'var(--muted)';
-      const title=val!==null?`${ym}: ${txt} (${metricKey==='dd'||metricKey==='neg'?'月平均(絶対値)':'月平均'})`:'データなし';
+      const title=val!==null?`${ym}: ${txt} (${metricKey==='neg'?'月平均日数':'月平均'})`:'データなし';
       const clickable = val!==null;
       html+=`<td style="background:${bg};border-radius:4px;width:52px;height:28px;text-align:center;color:${textColor};font-family:'JetBrains Mono',monospace;cursor:${clickable?'pointer':'default'};" title="${title}" ${clickable?`onclick="showHmDetail('${ym}')"`:''}>${txt}</td>`;
     }
@@ -1371,7 +1330,7 @@ function renderHeatmap(results,metricKey,mode){
     <span>低</span>
     <div style="width:120px;height:10px;border-radius:4px;background:linear-gradient(90deg,rgb(48,0,180),rgb(255,185,0),rgb(16,185,129))"></div>
     <span>高</span>
-    <span style="margin-left:.5rem;">範囲: ${vmin.toFixed(2)} 〜 ${vmax.toFixed(2)}</span>
+    <span style="margin-left:.5rem;">範囲: ${metricKey==='neg'?(-vmax).toFixed(0)+' 〜 '+(-vmin).toFixed(0):vmin.toFixed(1)+' 〜 '+vmax.toFixed(1)}</span>
   </div></div>`;
 
   container.innerHTML=html;
@@ -1460,248 +1419,39 @@ function showHmDetailYear(yr){
   drawHmDetailChart(avgSeries, labels, yr+'年 平均推移 ('+allSeries.length+'開始日の平均)');
 }
 
-function drawHmDetailChart(series, labels, title){
-  const card=document.getElementById('hm-detail-card');
-  card.style.display='';
-  document.getElementById('hm-detail-title').textContent='📈 '+title;
-  if(hmDetailChartInst) hmDetailChartInst.destroy();
-  const canvas=document.getElementById('hm-detail-chart');
-  hmDetailChartInst=new Chart(canvas,{
-    type:'line',
-    data:{
-      labels,
-      datasets:[{
-        label:'平均評価額',data:series,
-        borderColor:'rgba(245,158,11,0.9)',backgroundColor:'rgba(245,158,11,0.08)',
-        borderWidth:2,pointRadius:0,fill:true,tension:0.3
-      },{
-        label:'元本(100)',
-        data:series.map(()=>100),
-        borderColor:'rgba(255,255,255,0.15)',borderDash:[4,4],
-        borderWidth:1,pointRadius:0,fill:false
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      animation:{duration:300},
-      scales:{
-        x:{ticks:{color:'#4b6484',maxTicksLimit:12,font:{size:10}},grid:{color:'rgba(30,48,80,.5)'}},
-        y:{ticks:{color:'#4b6484',font:{size:10}},grid:{color:'rgba(30,48,80,.5)'}}
-      },
-      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}},tooltip:{mode:'index',intersect:false}}
+function drawHmDetailChart(avgSeries, _unused_labels, title){
+  // ヒートマップ詳細を既存メインチャートに「月平均推移」として追加して再描画
+  if(!currentDates || !currentSeries){
+    alert('先にマニュアルモードでシミュレーションを実行してください');
+    return;
+  }
+  // 月平均系列をcurrentSeriesに追加（同じ長さに揃える）
+  const n = currentDates.length;
+  const padded = new Array(n).fill(null);
+  // avgSeriesは全期間を通した平均なので、全期間の先頭から対応させる
+  for(let i=0;i<Math.min(avgSeries.length, n);i++) padded[i]=avgSeries[i];
+  currentSeries.hmAvg={
+    label:'HM平均: '+title,
+    series:padded,
+    color:'rgba(245,158,11,0.9)',
+    fill:false,
+    colorRGB:'245,158,11',
+    dash:[5,3]
+  };
+  redrawMainChart();
+  // メインチャートにスクロール
+  document.querySelector('.chart-card').scrollIntoView({behavior:'smooth',block:'nearest'});
+  // 凡例にHMラベルを目立たせる
+  setTimeout(()=>{
+    const legEl=document.getElementById('main-legend');
+    if(legEl){
+      const items=legEl.querySelectorAll('.leg-item');
+      items.forEach(el=>{
+        if(el.textContent.includes('HM平均')) el.style.fontWeight='700';
+      });
     }
-  });
-  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
 }
-
-// ═══════════════════════════════════════════════════
-//  OPTIMIZATION ENGINE
-//  Strategy: 3-phase random search on integer allocation space
-//    Phase 1 (30%): wide uniform random  → explore
-//    Phase 2 (50%): neighbour search ±12% around best  → exploit
-//    Phase 3 (20%): tight search  ±4% around best  → fine-tune
-//  Much faster and more reliable than GP on this low-dim integer grid.
-// ═══════════════════════════════════════════════════
-
-function ncdf(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.7814779+t*(-1.8212560+t*1.3302744))));return z>0?1-p:p;}
-function npdf(z){return Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);}
-
-// Generate a random valid allocation within [mn,mx] per asset, summing to 100
-function rand5(mn, mx, useJ, useU, center, spread){
-  // 3〜5資産、合計100%の整数配分を生成
-  const nA = 3 + (useJ?1:0) + (useU?1:0);
-  for(let attempt=0;attempt<1200;attempt++){
-    let t,s,g,j=0,u=0;
-    if(center && spread>0){
-      // 中心点から±spreadで摂動して再正規化
-      const raw_t=Math.max(mn,Math.min(mx,Math.round(center.t+(Math.random()*2-1)*spread)));
-      const raw_s=Math.max(mn,Math.min(mx,Math.round(center.s+(Math.random()*2-1)*spread)));
-      const raw_g=Math.max(mn,Math.min(mx,Math.round(center.g+(Math.random()*2-1)*spread)));
-      const raw_j=useJ?Math.max(mn,Math.min(mx,Math.round((center.j||0)+(Math.random()*2-1)*spread))):0;
-      const raw_u=useU?Math.max(mn,Math.min(mx,Math.round((center.u||0)+(Math.random()*2-1)*spread))):0;
-      const tot=raw_t+raw_s+raw_g+raw_j+raw_u; if(tot===0)continue;
-      t=Math.round(raw_t/tot*100);s=Math.round(raw_s/tot*100);g=Math.round(raw_g/tot*100);
-      j=useJ?Math.round(raw_j/tot*100):0;
-      u=useU?100-t-s-g-j:0;
-      if(!useU&&!useJ&&t+s+g!==100)u=0,j=0,g=100-t-s;
-      if(!useU&&useJ) j=100-t-s-g;
-      if(t<mn||t>mx||s<mn||s>mx||g<mn||g>mx)continue;
-      if(useJ&&(j<mn||j>mx))continue;
-      if(useU&&(u<mn||u>mx))continue;
-      if(t+s+g+j+u!==100)continue;
-    } else {
-      t=Math.round(mn+Math.random()*(mx-mn));
-      {const rem=100-t-mn*(nA-1);if(rem<0)continue;const m2=Math.min(mx,t+rem-mn*(nA-2));if(m2<mn)continue;s=Math.round(mn+Math.random()*(m2-mn));}
-      {const rem=100-t-s-mn*(nA-2);if(rem<0)continue;const m2=Math.min(mx,rem);if(m2<mn)continue;g=Math.round(mn+Math.random()*(m2-mn));}
-      if(useJ&&useU){
-        const rem=100-t-s-g-mn;if(rem<mn||rem>mx)continue;
-        j=Math.round(mn+Math.random()*Math.min(mx-mn,rem-mn));
-        u=100-t-s-g-j;if(u<mn||u>mx)continue;
-      } else if(useJ){j=100-t-s-g;if(j<mn||j>mx)continue;}
-      else if(useU){u=100-t-s-g;if(u<mn||u>mx)continue;}
-      else{if(t+s+g!==100)continue;}
-    }
-    return{t,s,g,j,u};
-  }
-  return null;
-}
-
-function objScore(ti,si,gi,ji,ui,alloc,objKey,dates,rbOn,rbThresh){
-  const{series:s}=portSeries(ti,si,gi,ji,ui,alloc,rbOn,rbThresh,rbMode,dates);
-  const{maxDD,cagr,vol}=calcMetrics(s,dates);
-  // 指標を%単位に変換（スケール統一）
-  const C=cagr*100;   // 年率リターン(%) 例: 8.0
-  const D=maxDD*100;  // 最大DD(%)       例: 20.0
-  const V=vol*100;    // 年率ボラ(%)     例: 15.0
-
-  // ── バランス型（推奨）──
-  // リターン重視しつつDDとボラにペナルティ。
-  // 国債100%はC≈0〜1%, D≈0, V≈1% → score≈0-0-5=-5 (低い)
-  // S&P寄りはC≈10%, D≈20%, V≈15% → score≈10-10-7.5=-7.5 (中)
-  // バランス型はC≈7%, D≈10%, V≈8% → score≈7-5-4=−2 (最良)
-  if(objKey==='balanced'){
-    // CAGR 2%未満は強制ペナルティ（国債・低リターン逃げを防ぐ）
-    if(C < 2.0) return -30 + C;
-    // リターン重視、DD・ボラを半減ペナルティ
-    return C - D*0.5 - V*0.3;
-  }
-
-  // ── リターン/リスク比（改善Calmar）──
-  // CAGRをDDで割るが、CAGR<1%の場合に大ペナルティ → 低リターン高安全逃げを防ぐ
-  if(objKey==='calmar_floor'){
-    if(C<1.0) return C - 50;  // 年率1%未満は強制ペナルティ
-    return D>0.1 ? C/D : C*10;
-  }
-
-  // ── リスク調整リターン（改善Sharpe）──
-  if(objKey==='sharpe_floor'){
-    if(C<1.0) return C - 50;
-    return V>0.1 ? C/V : C*10;
-  }
-
-  // ── 純粋Calmar ──
-  if(objKey==='calmar') return D>0.1?C/D:(C>0?C*10:-100);
-
-  // ── 純粋Sharpe ──
-  if(objKey==='sharpe') return V>0.1?C/V:(C>0?C*10:-100);
-
-  // ── 最大リターン ──
-  return C;
-}
-
-async function runOpt(){
-  clearErr();
-  if(!raw.topix||!raw.sp||!raw.gold||!raw.usdjpy){showErr('4つのCSVをインポートしてください');return;}
-  const sd=document.getElementById('start-date').value;
-  if(!sd){showErr('開始日を選択してください');return;}
-  const dates=getDates(sd);
-  if(dates.length<10){showErr('データ不足');return;}
-  const{ti,si,gi,ji,ui}=buildIdx(dates);
-
-  const objKey = document.getElementById('opt-obj').value;
-  const iters  = Math.min(500, Math.max(20, parseInt(document.getElementById('opt-iters').value)||80));
-  const mn     = Math.max(0,   parseInt(document.getElementById('opt-min').value)||0);
-  const mx     = Math.min(100, parseInt(document.getElementById('opt-max').value)||100);
-  const useJ   = raw.jgb !== null;
-  const useU   = raw.ustb !== null;
-  const rbOn   = document.getElementById('rb-toggle').checked;
-  const rbThresh = parseFloat(document.getElementById('rb-threshold').value)||5;
-
-  const nAssets=3+(useJ?1:0)+(useU?1:0);
-  if(mn*nAssets>100){showErr('最小配分の合計が100%を超えています');return;}
-
-  busy=true;
-  document.getElementById('run-btn').disabled=true;
-  document.getElementById('progress-wrap').classList.add('show');
-
-  let bestScore=-Infinity, bestPt=null;
-  const hS=[], hB=[];
-
-  // Phase boundaries
-  const ph1End = Math.floor(iters * 0.30);  // wide random
-  const ph2End = Math.floor(iters * 0.80);  // neighbour ±12%
-  // rest: tight ±4%
-
-  for(let it=0; it<iters; it++){
-    let pt;
-    if(it < ph1End){
-      // Phase 1: pure uniform random
-      pt = rand5(mn, mx, useJ, useU);
-    } else if(it < ph2End){
-      // Phase 2: perturb best ±12%, fallback to random
-      pt = (bestPt ? rand5(mn, mx, useJ, useU, bestPt, 12) : null) || rand5(mn, mx, useJ, useU);
-    } else {
-      // Phase 3: tight refinement ±4%
-      pt = (bestPt ? rand5(mn, mx, useJ, useU, bestPt, 4) : null) || rand5(mn, mx, useJ, useU);
-    }
-    if(!pt){ hS.push(bestScore===-Infinity?null:bestScore); hB.push(bestScore===-Infinity?null:bestScore); continue; }
-
-    const sc = objScore(ti,si,gi,ji,ui,pt,objKey,dates,rbOn,rbThresh);
-    hS.push(isFinite(sc)?sc:null);
-    if(isFinite(sc) && sc > bestScore){ bestScore=sc; bestPt={...pt}; }
-    hB.push(bestScore===-Infinity?null:bestScore);
-
-    updProg(it+1, iters, bestScore, objKey);
-    if(it%8===0) await sleep(0);
-  }
-
-  busy=false;
-  document.getElementById('run-btn').disabled=false;
-  document.getElementById('progress-wrap').classList.remove('show');
-
-  if(!bestPt){showErr('有効な配分が見つかりませんでした');return;}
-
-  // Show results
-  const objLbls={balanced:'バランス型スコア',calmar_floor:'Calmar+下限',sharpe_floor:'Sharpe+下限',calmar:'Calmar比率',sharpe:'Sharpe比率',return:'CAGR年率'};
-  document.getElementById('oav-topix').textContent = bestPt.t+'%';
-  document.getElementById('oav-sp').textContent    = bestPt.s+'%';
-  document.getElementById('oav-gold').textContent  = bestPt.g+'%';
-  document.getElementById('oav-jgb').textContent   = useJ ? bestPt.j+'%' : '—';
-  if(document.getElementById('oav-ustb-item'))
-    document.getElementById('oav-ustb-item').style.display = useU ? '' : 'none';
-  if(document.getElementById('oav-ustb'))
-    document.getElementById('oav-ustb').textContent  = useU ? (bestPt.u||0)+'%' : '—';
-  document.getElementById('osr-label').textContent = objLbls[objKey];
-  document.getElementById('osr-val').textContent   = objKey==='return'
-    ? (bestScore*100).toFixed(2)+'%' : bestScore.toFixed(3);
-  document.getElementById('osr-iter').textContent  = '試行: '+hS.length+'回';
-
-  // Run simulation with best allocation (pass flag to preserve opt-result display)
-  document.getElementById('heatmap-card').classList.remove('show');
-  runSim(bestPt, true);
-
-  // Show opt-result and iter-chart AFTER runSim (runSim may update DOM)
-  document.getElementById('opt-result').classList.add('show');
-  drawIterChart(hS, hB, objLbls[objKey]);
-  document.getElementById('iter-card').classList.add('show');
-}
-function updProg(cur,tot,best,obj){
-  const pct=Math.round(cur/tot*100);
-  document.getElementById('prog-fill').style.width=pct+'%';
-  document.getElementById('prog-pct').textContent=pct+'%';
-  const lbl={balanced:'バランス',calmar_floor:'Calmar+下限',sharpe_floor:'Sharpe+下限',calmar:'Calmar',sharpe:'Sharpe',return:'CAGR'};
-  const sv=best===-Infinity?'—':(obj==='return'?(best*100).toFixed(1)+'%':best.toFixed(3));
-  document.getElementById('prog-text').textContent=`最適化中 ${cur}/${tot} | Best ${lbl[obj]}: ${sv}`;
-}
-function drawIterChart(scores,bestCurve,objLabel){
-  if(iterChartInst)iterChartInst.destroy();
-  const canvas=document.getElementById('iter-chart');
-  iterChartInst=new Chart(canvas,{type:'line',data:{labels:scores.map((_,i)=>i+1),datasets:[
-    {label:'各試行',data:scores,borderColor:'rgba(124,58,237,.5)',borderWidth:1,pointRadius:2,fill:false,tension:.1,order:1},
-    {label:'最良値',data:bestCurve,borderColor:'rgba(244,114,182,1)',borderWidth:2,pointRadius:0,fill:false,tension:.4,order:0},
-  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f1623',borderColor:'#1e3050',borderWidth:1,titleColor:'#e2e8f0',bodyColor:'#94a3b8',
-      titleFont:{family:'JetBrains Mono',size:10},bodyFont:{family:'JetBrains Mono',size:10},
-      callbacks:{label:c=>` ${c.dataset.label}: ${typeof c.parsed.y==='number'?c.parsed.y.toFixed(4):'—'}`}}},
-    scales:{
-      x:{ticks:{color:'#4b6484',font:{size:9},maxTicksLimit:10},grid:{color:'rgba(30,48,80,.4)'}},
-      y:{ticks:{color:'#4b6484',font:{size:9}},grid:{color:'rgba(30,48,80,.4)'},title:{display:true,text:objLabel,color:'#4b6484',font:{size:9}}}
-    }}});
-}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-
-// ── Init ──
-updateTotal();
 
 // ═══════════════════════════════════════════════════
 //  AUTO-LOAD: fetch CSVs from data/ folder at startup
@@ -1712,6 +1462,7 @@ const AUTO_CSV_PATHS = {
   gold:   'data/gold.csv',
   usdjpy: 'data/usdjpy.csv',
   jgb:    'data/jgb.csv',   // optional
+  ustb:   'data/ustb.csv',  // optional
 };
 
 async function tryAutoLoad(){
@@ -1739,7 +1490,16 @@ async function tryAutoLoad(){
       // Update UI
       document.getElementById('card-'+key).classList.add('loaded');
       document.getElementById('sts-'+key).textContent=Object.keys(raw[key]).length+'件 (自動)';
-      if(key==='jgb') document.getElementById('row-jgb').style.display='';
+      if(key==='jgb'){
+        document.getElementById('row-jgb').style.display='';
+        document.getElementById('hm-row-jgb').style.display='';
+      }
+      if(key==='ustb'){
+        document.getElementById('row-ustb').style.display='';
+        document.getElementById('hm-row-ustb').style.display='';
+        const el=document.getElementById('oav-ustb-item');
+        if(el) el.style.display='';
+      }
       return true;
     }catch(e){
       return false;
@@ -1751,8 +1511,8 @@ async function tryAutoLoad(){
   loaded=results.filter(Boolean).length;
   failed=required.filter((_,i)=>!results[i]);
 
-  // Load optional JGB
-  await fetchCSV('jgb', AUTO_CSV_PATHS.jgb);
+  // Load optional JGB + USTB
+  await Promise.all(['jgb','ustb'].map(k=>fetchCSV(k, AUTO_CSV_PATHS[k])));
 
   if(failed.length===0){
     msg.textContent=`✓ 自動読み込み完了 — ${loaded}ファイル`;
