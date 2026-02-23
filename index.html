@@ -529,6 +529,8 @@ let appMode='manual', rbMode='band', busy=false, periodView='full';
 let savedPortfolios=[];
 let mainChartInst=null, iterChartInst=null, hmDetailChartInst=null;
 let currentDates=null, currentSeries={};
+// HMチャート専用state（マニュアルと完全分離）
+let hmChartDates=null, hmChartSeries={};
 let lastRBLog=[];
 const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)','var(--c7)'];
 const COLORSRGB=['0,200,248','167,139,250','52,211,153','251,191,36','248,113,113','251,146,60','232,121,249','74,222,128'];
@@ -815,26 +817,78 @@ function advanceOneYearMs(ms){
   const d=new Date(ms);d.setFullYear(d.getFullYear()+1);return d.getTime();
 }
 
-function buildIdx(dates){
-  const p0={t:raw.topix[dates[0]],s:raw.sp[dates[0]],g:raw.gold[dates[0]],fx:raw.usdjpy[dates[0]]};
-  const hasUSTB=!!raw.ustb;
-  const p0u=hasUSTB?(raw.ustb[dates[0]]??null):null;
-  const ti=[],si=[],gi=[],ui=[];
-  for(const d of dates){
-    const fx=raw.usdjpy[d];
-    ti.push(raw.topix[d]/p0.t*100);
-    si.push((raw.sp[d]*fx)/(p0.s*p0.fx)*100);
-    gi.push((raw.gold[d]*fx)/(p0.g*p0.fx)*100);
-    // 米国債: USD価格×為替→円評価。価格がない日は直近補間
-    if(hasUSTB && p0u!==null){
-      const uv=raw.ustb[d]??null;
-      // 直近有効価格を補間
-      ui.push(uv!==null ? (uv*fx)/(p0u*p0.fx)*100 : (ui.length>0?ui[ui.length-1]:100));
-    } else {
-      ui.push(null);
-    }
+// ── USTB: 1年利回り(%)の複利運用 × USD/JPY為替換算 ──
+// JGBと同じ複利ロジック、ただし円換算のためFX比率を掛ける
+function buildUSTBSeries(dates){
+  if(!raw.ustb) return dates.map(()=>null);
+  const n=dates.length;
+  const series=new Array(n);
+  series[0]=100;
+
+  let ts;
+  if(_commonTsMs && _commonDatesSorted && dates.length===_commonDatesSorted.length && dates[0]===_commonDatesSorted[0]){
+    ts=_commonTsMs;
+  } else {
+    ts=new Float64Array(n);
+    for(let i=0;i<n;i++) ts[i]=new Date(dates[i]).getTime();
   }
+
+  // FX基準値（開始日）
+  const fx0=raw.usdjpy[dates[0]];
+
+  // USTBの利回りを取得するヘルパー（直近補間）
+  function getUSTBYieldAt(dateStr){
+    if(raw.ustb[dateStr]!==undefined) return raw.ustb[dateStr];
+    // 直近の有効日を線形探索（ソート済みキーがあればbisect）
+    const keys=Object.keys(raw.ustb).sort();
+    let best=null;
+    for(const k of keys){if(k<=dateStr) best=k; else break;}
+    return best?raw.ustb[best]:null;
+  }
+
+  let periodStartMs=ts[0];
+  let nextAnnivMs=advanceOneYearMs(periodStartMs);
+  let yld=getUSTBYieldAt(dates[0]);
+  let acc=100; // USD建て複利価値（基準=100）
+
+  for(let i=1;i<n;i++){
+    const tMs=ts[i];
+    while(tMs>=nextAnnivMs){
+      if(yld!==null) acc*=(1+yld/100);
+      periodStartMs=nextAnnivMs;
+      nextAnnivMs=advanceOneYearMs(periodStartMs);
+      yld=getUSTBYieldAt(msToDateStr(periodStartMs));
+    }
+    const frac=(tMs-periodStartMs)/(nextAnnivMs-periodStartMs);
+    const usdVal=yld!==null ? acc*Math.pow(1+yld/100,frac) : acc;
+    // 円換算: USD価値 × (当日FX / 開始日FX)
+    const fx=raw.usdjpy[dates[i]]??fx0;
+    series[i]=usdVal*(fx/fx0);
+  }
+  return series;
+}
+
+function buildIdx(dates){
+  // 開始日の基準値
+  const p0t=raw.topix[dates[0]];
+  const p0s=raw.sp[dates[0]];
+  const p0g=raw.gold[dates[0]];
+  const p0fx=raw.usdjpy[dates[0]];
+
+  const ti=[],si=[],gi=[];
+  for(const d of dates){
+    const fx=raw.usdjpy[d]??p0fx;
+    // TOPIX: 円建て株価指数→そのまま比率
+    ti.push(raw.topix[d]/p0t*100);
+    // S&P500: USD建て × FX → 円評価
+    si.push((raw.sp[d]*fx)/(p0s*p0fx)*100);
+    // Gold: USD建て × FX → 円評価
+    gi.push((raw.gold[d]*fx)/(p0g*p0fx)*100);
+  }
+  // 日本国債: 利回りベース複利（JGBSeries）
   const ji=buildJGBSeries(dates);
+  // 米国債: 利回りベース複利 × FX換算（USTBSeries）
+  const ui=buildUSTBSeries(dates);
   return{ti,si,gi,ji,ui};
 }
 
@@ -939,7 +993,8 @@ function setPeriodView(v){
   periodView=v;
   document.getElementById('btn-full').className='ctrl-btn'+(v==='full'?' active':'');
   document.getElementById('btn-neg').className='ctrl-btn'+(v==='neg'?' active':'');
-  if(currentDates)redrawMainChart();
+  // 元本割れ期間切替はマニュアルチャートのみ
+  if(currentDates && appMode==='manual') redrawMainChart();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1012,10 +1067,12 @@ function runSim(overrideAlloc){
   renderRBHistory(rbLog,rbOn,a);
   renderAssetCompTable(dates,ti,si,gi,ji,ui,a,metrics);
   document.getElementById('heatmap-card').classList.remove('show');
+  // マニュアル実行時はHMチャートstateをクリア
+  hmChartDates=null; hmChartSeries={};
 }
 
 // ═══════════════════════════════════════════════════
-//  REDRAW MAIN CHART
+//  REDRAW MAIN CHART（マニュアルモード）
 // ═══════════════════════════════════════════════════
 function redrawMainChart(){
   if(!currentDates||!currentSeries)return;
@@ -1032,38 +1089,59 @@ function redrawMainChart(){
     }
     if(last!==-1){startIdx=Math.max(0,first-1);endIdx=Math.min(dates.length-1,last+1);}
   }
+  _drawChartOnCanvas('main-chart','main-legend',dates,currentSeries,startIdx,endIdx,'current');
+}
+
+// ── HM詳細チャート描画（マニュアルstateとは完全独立）──
+function drawHmChart(){
+  if(!hmChartDates||!hmChartSeries||!Object.keys(hmChartSeries).length)return;
+  const dates=hmChartDates;
+  // HM平均系列のみなので全期間表示（有効データが始まる先頭〜末尾）
+  const series=hmChartSeries.hmAvg ? hmChartSeries.hmAvg.series : null;
+  let startIdx=0,endIdx=dates.length-1;
+  if(series){
+    // 有効データの範囲に絞る（nullでない部分）
+    while(startIdx<series.length && series[startIdx]==null) startIdx++;
+    while(endIdx>startIdx && series[endIdx]==null) endIdx--;
+  }
+  _drawChartOnCanvas('main-chart','main-legend',dates,hmChartSeries,startIdx,endIdx,'hmAvg');
+}
+
+// ── 共通チャート描画エンジン ──
+function _drawChartOnCanvas(canvasId, legendId, dates, seriesMap, startIdx, endIdx, primaryKey){
   const sliced=dates.slice(startIdx,endIdx+1);
   const M=700,step=Math.max(1,Math.ceil(sliced.length/M));
   const lbls=sliced.filter((_,i)=>i%step===0||i===sliced.length-1);
-  const datasets=Object.keys(currentSeries).map(key=>{
-    const sr=currentSeries[key];
+  const datasets=Object.keys(seriesMap).map(key=>{
+    const sr=seriesMap[key];
     const raw2=sr.series.slice(startIdx,endIdx+1);
     const data=raw2.filter((_,i)=>i%step===0||i===raw2.length-1);
-    const isHmAvg=key==='hmAvg';
+    const isPrimary=key===primaryKey;
     return{
       label:sr.label,data,
       borderColor:sr.color,
       backgroundColor:sr.fill?`rgba(${sr.colorRGB},.07)`:'transparent',
-      borderWidth:sr.fill?2:isHmAvg?2:key.startsWith('saved')?1.5:1,
+      borderWidth:sr.fill?2:isPrimary?2:key.startsWith('saved')?1.5:1,
       borderDash:sr.dash||[],
       pointRadius:0,fill:sr.fill?'origin':false,tension:0.3,
       order:sr.fill?0:1,
-      spanGaps:isHmAvg,
+      spanGaps:true,
     };
   });
   document.getElementById('placeholder').style.display='none';
-  const canvas=document.getElementById('main-chart');canvas.style.display='block';
-  if(mainChartInst)mainChartInst.destroy();
-  // y軸: 「現在の配分」またはHM平均を基準に範囲を決定し、他は見切れOK
-  const curKey = currentSeries.hmAvg && !currentSeries.current ? 'hmAvg' : (currentSeries.hmAvg ? 'hmAvg' : 'current');
-  const curData = currentSeries[curKey] ? currentSeries[curKey].series.slice(startIdx,endIdx+1).filter(v=>v!=null) : [];
-  const curMin = curData.length ? Math.min(...curData) : 80;
-  const curMax = curData.length ? Math.max(...curData) : 150;
-  const curRange = Math.max(curMax-curMin, 30);
-  // 余白: 上下10%
-  const pad = curRange * 0.10;
-  const yMin = Math.floor(Math.max(0, curMin - pad));
-  const yMax = Math.ceil(curMax + pad);
+  const canvas=document.getElementById(canvasId);
+  canvas.style.display='block';
+  if(mainChartInst){mainChartInst.destroy();mainChartInst=null;}
+
+  // y軸: primaryKey系列のみを基準に範囲決定
+  const pri=seriesMap[primaryKey];
+  const priData=pri ? pri.series.slice(startIdx,endIdx+1).filter(v=>v!=null&&isFinite(v)) : [];
+  const priMin=priData.length ? Math.min(...priData) : 80;
+  const priMax=priData.length ? Math.max(...priData) : 150;
+  const priRange=Math.max(priMax-priMin, 20);
+  const pad=priRange*0.12;
+  const yMin=Math.floor(Math.max(0, priMin-pad));
+  const yMax=Math.ceil(priMax+pad);
 
   mainChartInst=new Chart(canvas,{
     type:'line',data:{labels:lbls,datasets},
@@ -1074,27 +1152,33 @@ function redrawMainChart(){
         backgroundColor:'#0f1623',borderColor:'#1e3050',borderWidth:1,
         titleColor:'#e2e8f0',bodyColor:'#94a3b8',
         titleFont:{family:'JetBrains Mono',size:10},bodyFont:{family:'JetBrains Mono',size:10},
-        callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y.toFixed(2)}`}
+        callbacks:{label:c=>{
+          if(c.parsed.y==null||!isFinite(c.parsed.y)) return null;
+          return ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)}`;
+        }}
       }},
       scales:{
         x:{ticks:{color:'#4b6484',font:{size:9},maxTicksLimit:9},grid:{color:'rgba(30,48,80,.5)'}},
-        y:{
-          min:yMin,max:yMax,
-          ticks:{color:'#4b6484',font:{size:9}},
-          grid:{color:'rgba(30,48,80,.5)'}
-        }
+        y:{min:yMin,max:yMax,ticks:{color:'#4b6484',font:{size:9}},grid:{color:'rgba(30,48,80,.5)'}}
       }
     }
   });
-  const legEl=document.getElementById('main-legend');
-  legEl.innerHTML=Object.keys(currentSeries).map(key=>{
-    const sr=currentSeries[key];
-    return`<div class="leg-item" onclick="toggleLeg('${key}',this)">
-      <div class="leg-line" style="background:${sr.color}"></div><span>${sr.label}</span></div>`;
-  }).join('');
+  const legEl=document.getElementById(legendId);
+  if(legEl){
+    legEl.innerHTML=Object.keys(seriesMap).map(key=>{
+      const sr=seriesMap[key];
+      return`<div class="leg-item" onclick="toggleLeg('${key}',this)">
+        <div class="leg-line" style="background:${sr.color}"></div><span>${sr.label}</span></div>`;
+    }).join('');
+  }
 }
 function toggleLeg(key,el){
-  const idx=Object.keys(currentSeries).indexOf(key);if(idx<0)return;
+  if(!mainChartInst) return;
+  // アクティブなseriesMapを判断
+  const activeMap = (appMode==='heatmap' && hmChartSeries && Object.keys(hmChartSeries).length)
+    ? hmChartSeries : currentSeries;
+  const idx=Object.keys(activeMap).indexOf(key);
+  if(idx<0)return;
   const meta=mainChartInst.getDatasetMeta(idx);
   meta.hidden=!meta.hidden;el.classList.toggle('hidden',!!meta.hidden);mainChartInst.update();
 }
@@ -1516,28 +1600,29 @@ function showHmDetailYear(yr){
 }
 
 function drawHmDetailChart(avgSeries, _unused_labels, title){
-  // ヒートマップ単体でも動作: currentSeriesがなければHM平均のみで初期化
-  if(!currentDates || !currentSeries){
-    // ヒートマップの全期間データをそのまま使ってチャート用のstateを構築
-    const allDates = _commonDatesSorted;
-    if(!allDates || !allDates.length) return;
-    currentDates = allDates;
-    currentSeries = {};
-  }
+  // HM専用stateに格納（マニュアルのcurrentDates/currentSeriesを一切変更しない）
+  const allDates = _commonDatesSorted;
+  if(!allDates || !allDates.length) return;
 
-  // HM平均系列をcurrentSeriesに追加（全期間先頭から対応）
-  const n = currentDates.length;
-  const padded = new Array(n).fill(null);
-  for(let i=0;i<Math.min(avgSeries.length, n);i++) padded[i]=avgSeries[i];
-  currentSeries.hmAvg={
-    label:'HM平均: '+title,
-    series:padded,
-    color:'rgba(245,158,11,0.9)',
-    fill:false,
-    colorRGB:'245,158,11',
-    dash:[5,3]
+  // avgSeriesは相対インデックス0始まり（クリックした開始月〜全期間末）
+  // x軸を「経過営業日数」として使うため、相対インデックス配列を作る
+  const n = avgSeries.length;
+  const relativeDates = Array.from({length:n},(_,i)=>i===0?'0':(i%60===0?(Math.round(i/21)+'M'):''));
+
+  hmChartDates = relativeDates;
+  hmChartSeries = {
+    hmAvg:{
+      label:'HM平均: '+title,
+      series:avgSeries.slice(),
+      color:'rgba(245,158,11,0.9)',
+      fill:false,
+      colorRGB:'245,158,11',
+      dash:[5,3]
+    }
   };
-  redrawMainChart();
+
+  drawHmChart();
+
   // メインチャートにスクロール
   document.querySelector('.chart-card').scrollIntoView({behavior:'smooth',block:'nearest'});
   // 凡例にHMラベルを目立たせる
