@@ -983,11 +983,13 @@ function redrawMainChart(){
   const dates=currentDates;
   let startIdx=0,endIdx=dates.length-1;
   if(periodView==='neg'){
-    const portKeys=Object.keys(currentSeries).filter(k=>!['topix','sp','gold','jgb'].includes(k));
+    // 「現在の配分」系列のみを基準に元本割れ期間を特定
+    const curSeries=currentSeries.current ? currentSeries.current.series : null;
     let first=Infinity,last=-1;
-    for(const k of portKeys){
-      const s=currentSeries[k].series;
-      for(let i=0;i<s.length;i++){if(s[i]<100){if(i<first)first=i;if(i>last)last=i;}}
+    if(curSeries){
+      for(let i=0;i<curSeries.length;i++){
+        if(curSeries[i]<100){if(i<first)first=i;if(i>last)last=i;}
+      }
     }
     if(last!==-1){startIdx=Math.max(0,first-1);endIdx=Math.min(dates.length-1,last+1);}
   }
@@ -1013,22 +1015,16 @@ function redrawMainChart(){
   document.getElementById('placeholder').style.display='none';
   const canvas=document.getElementById('main-chart');canvas.style.display='block';
   if(mainChartInst)mainChartInst.destroy();
-  // 「現在の配分」系列の値範囲を計算してy軸を中心化
+  // y軸: 「現在の配分」系列だけを基準に範囲を決定し、他は見切れOK
   const curKey = currentSeries.hmAvg ? 'hmAvg' : 'current';
   const curData = currentSeries[curKey] ? currentSeries[curKey].series.slice(startIdx,endIdx+1).filter(v=>v!=null) : [];
   const curMin = curData.length ? Math.min(...curData) : 80;
   const curMax = curData.length ? Math.max(...curData) : 150;
-  const curMid = (curMin+curMax)/2;
   const curRange = Math.max(curMax-curMin, 30);
-  // 全データセットの最大・最小も考慮
-  const allVals = datasets.flatMap(ds=>ds.data).filter(v=>v!=null&&isFinite(v));
-  const allMin = allVals.length ? Math.min(...allVals) : curMin;
-  const allMax = allVals.length ? Math.max(...allVals) : curMax;
-  // y軸: 現在配分の中心±(range×0.7)、かつ全データを包含、さらに余白15%
-  const yCenter = curMid;
-  const yHalf = Math.max(curRange*0.7, Math.max(yCenter-allMin, allMax-yCenter)) * 1.15;
-  const yMin = Math.floor(Math.max(0, yCenter-yHalf));
-  const yMax = Math.ceil(yCenter+yHalf);
+  // 余白: 上下10%
+  const pad = curRange * 0.10;
+  const yMin = Math.floor(Math.max(0, curMin - pad));
+  const yMax = Math.ceil(curMax + pad);
 
   mainChartInst=new Chart(canvas,{
     type:'line',data:{labels:lbls,datasets},
@@ -1159,6 +1155,8 @@ function buildHmResults(rawMetrics, metricKey){
 // ═══════════════════════════════════════════════════
 //  HEATMAP: all-period simulation
 // ═══════════════════════════════════════════════════
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function runHeatmap(){
   clearErr();
   const a=hmGetAlloc();
