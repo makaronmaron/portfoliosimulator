@@ -529,8 +529,6 @@ let appMode='manual', rbMode='band', busy=false, periodView='full';
 let savedPortfolios=[];
 let mainChartInst=null, iterChartInst=null, hmDetailChartInst=null;
 let currentDates=null, currentSeries={};
-// HMチャート専用state（マニュアルと完全分離）
-let hmChartDates=null, hmChartSeries={};
 let lastRBLog=[];
 const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)','var(--c7)'];
 const COLORSRGB=['0,200,248','167,139,250','52,211,153','251,191,36','248,113,113','251,146,60','232,121,249','74,222,128'];
@@ -993,8 +991,7 @@ function setPeriodView(v){
   periodView=v;
   document.getElementById('btn-full').className='ctrl-btn'+(v==='full'?' active':'');
   document.getElementById('btn-neg').className='ctrl-btn'+(v==='neg'?' active':'');
-  // 元本割れ期間切替はマニュアルチャートのみ
-  if(currentDates && appMode==='manual') redrawMainChart();
+  if(currentDates) redrawMainChart();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1067,19 +1064,16 @@ function runSim(overrideAlloc){
   renderRBHistory(rbLog,rbOn,a);
   renderAssetCompTable(dates,ti,si,gi,ji,ui,a,metrics);
   document.getElementById('heatmap-card').classList.remove('show');
-  // マニュアル実行時はHMチャートstateをクリア
-  hmChartDates=null; hmChartSeries={};
 }
 
 // ═══════════════════════════════════════════════════
-//  REDRAW MAIN CHART（マニュアルモード）
+//  REDRAW MAIN CHART（マニュアル・HMクリック共通）
 // ═══════════════════════════════════════════════════
 function redrawMainChart(){
   if(!currentDates||!currentSeries)return;
   const dates=currentDates;
   let startIdx=0,endIdx=dates.length-1;
   if(periodView==='neg'){
-    // 「現在の配分」系列のみを基準に元本割れ期間を特定
     const curSeries=currentSeries.current ? currentSeries.current.series : null;
     let first=Infinity,last=-1;
     if(curSeries){
@@ -1089,39 +1083,19 @@ function redrawMainChart(){
     }
     if(last!==-1){startIdx=Math.max(0,first-1);endIdx=Math.min(dates.length-1,last+1);}
   }
-  _drawChartOnCanvas('main-chart','main-legend',dates,currentSeries,startIdx,endIdx,'current');
-}
 
-// ── HM詳細チャート描画（マニュアルstateとは完全独立）──
-function drawHmChart(){
-  if(!hmChartDates||!hmChartSeries||!Object.keys(hmChartSeries).length)return;
-  const dates=hmChartDates;
-  // HM平均系列のみなので全期間表示（有効データが始まる先頭〜末尾）
-  const series=hmChartSeries.hmAvg ? hmChartSeries.hmAvg.series : null;
-  let startIdx=0,endIdx=dates.length-1;
-  if(series){
-    // 有効データの範囲に絞る（nullでない部分）
-    while(startIdx<series.length && series[startIdx]==null) startIdx++;
-    while(endIdx>startIdx && series[endIdx]==null) endIdx--;
-  }
-  _drawChartOnCanvas('main-chart','main-legend',dates,hmChartSeries,startIdx,endIdx,'hmAvg');
-}
-
-// ── 共通チャート描画エンジン ──
-function _drawChartOnCanvas(canvasId, legendId, dates, seriesMap, startIdx, endIdx, primaryKey){
   const sliced=dates.slice(startIdx,endIdx+1);
   const M=700,step=Math.max(1,Math.ceil(sliced.length/M));
   const lbls=sliced.filter((_,i)=>i%step===0||i===sliced.length-1);
-  const datasets=Object.keys(seriesMap).map(key=>{
-    const sr=seriesMap[key];
+  const datasets=Object.keys(currentSeries).map(key=>{
+    const sr=currentSeries[key];
     const raw2=sr.series.slice(startIdx,endIdx+1);
     const data=raw2.filter((_,i)=>i%step===0||i===raw2.length-1);
-    const isPrimary=key===primaryKey;
     return{
       label:sr.label,data,
       borderColor:sr.color,
       backgroundColor:sr.fill?`rgba(${sr.colorRGB},.07)`:'transparent',
-      borderWidth:sr.fill?2:isPrimary?2:key.startsWith('saved')?1.5:1,
+      borderWidth:sr.fill?2:key.startsWith('saved')?1.5:1,
       borderDash:sr.dash||[],
       pointRadius:0,fill:sr.fill?'origin':false,tension:0.3,
       order:sr.fill?0:1,
@@ -1129,12 +1103,12 @@ function _drawChartOnCanvas(canvasId, legendId, dates, seriesMap, startIdx, endI
     };
   });
   document.getElementById('placeholder').style.display='none';
-  const canvas=document.getElementById(canvasId);
+  const canvas=document.getElementById('main-chart');
   canvas.style.display='block';
   if(mainChartInst){mainChartInst.destroy();mainChartInst=null;}
 
-  // y軸: primaryKey系列のみを基準に範囲決定
-  const pri=seriesMap[primaryKey];
+  // y軸: current系列を基準に範囲決定（HMクリック時もcurrent='HM平均'として設定済み）
+  const pri=currentSeries.current;
   const priData=pri ? pri.series.slice(startIdx,endIdx+1).filter(v=>v!=null&&isFinite(v)) : [];
   const priMin=priData.length ? Math.min(...priData) : 80;
   const priMax=priData.length ? Math.max(...priData) : 150;
@@ -1163,10 +1137,10 @@ function _drawChartOnCanvas(canvasId, legendId, dates, seriesMap, startIdx, endI
       }
     }
   });
-  const legEl=document.getElementById(legendId);
+  const legEl=document.getElementById('main-legend');
   if(legEl){
-    legEl.innerHTML=Object.keys(seriesMap).map(key=>{
-      const sr=seriesMap[key];
+    legEl.innerHTML=Object.keys(currentSeries).map(key=>{
+      const sr=currentSeries[key];
       return`<div class="leg-item" onclick="toggleLeg('${key}',this)">
         <div class="leg-line" style="background:${sr.color}"></div><span>${sr.label}</span></div>`;
     }).join('');
@@ -1174,10 +1148,7 @@ function _drawChartOnCanvas(canvasId, legendId, dates, seriesMap, startIdx, endI
 }
 function toggleLeg(key,el){
   if(!mainChartInst) return;
-  // アクティブなseriesMapを判断
-  const activeMap = (appMode==='heatmap' && hmChartSeries && Object.keys(hmChartSeries).length)
-    ? hmChartSeries : currentSeries;
-  const idx=Object.keys(activeMap).indexOf(key);
+  const idx=Object.keys(currentSeries).indexOf(key);
   if(idx<0)return;
   const meta=mainChartInst.getDatasetMeta(idx);
   meta.hidden=!meta.hidden;el.classList.toggle('hidden',!!meta.hidden);mainChartInst.update();
@@ -1517,124 +1488,100 @@ function renderHeatmap(results,metricKey,mode){
 }
 
 // ── Heatmap detail: 月・年クリック時の推移グラフ ──
+// マニュアルと同じ方式で描画（月内の中央値日付を開始日として runSim 相当を実行）
 function showHmDetail(ym){
   if(!_hmDatesByYM||!_hmDatesByYM[ym]||!_hmAlloc) return;
   const a=_hmAlloc;
   const allDates=_commonDatesSorted;
   const rbOn=document.getElementById('rb-toggle').checked;
   const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
-  // この月の全開始日の平均系列を計算
+
+  // 月内の開始日インデックス配列から中央値インデックスを取得
   const idxArr=_hmDatesByYM[ym];
-  const seriesArr=[];
-  const fullIdx=buildIdx(allDates);
-  const{ti:FT,si:FS,gi:FG,ji:FJ,ui:FU}=fullIdx;
-  const hasJGB2=FJ[0]!==null, hasUSTB2=FU[0]!==null;
-  const minLen=22;
-  for(const si2 of idxArr){
-    const n2=allDates.length-si2;
-    if(n2<minLen) continue;
-    const ti3=new Float64Array(n2),si3=new Float64Array(n2),gi3=new Float64Array(n2);
-    const bt=FT[si2]/100,bs=FS[si2]/100,bg=FG[si2]/100;
-    let ji3null,ui3null;
-    if(hasJGB2){const bj=FJ[si2]/100,j3=new Float64Array(n2);for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;j3[k]=FJ[si2+k]/bj;}ji3null=Array.from(j3);}
-    else{for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;}ji3null=new Array(n2).fill(null);}
-    if(hasUSTB2){const bu=FU[si2]/100,u3=new Float64Array(n2);for(let k=0;k<n2;k++)u3[k]=FU[si2+k]/bu;ui3null=Array.from(u3);}
-    else ui3null=new Array(n2).fill(null);
-    const dates2=allDates.slice(si2);
-    const{series:ps}=portSeries(ti3,si3,gi3,ji3null,ui3null,a,rbOn,rbThresh,rbMode,dates2);
-    seriesArr.push(ps);
-  }
-  if(!seriesArr.length) return;
-  // 全系列の長さを最大共通長で揃えてインデックスごとの平均を計算
-  const maxL=Math.max(...seriesArr.map(s=>s.length));
-  // 年月ラベル（相対: 開始から経過月数）
-  const avgSeries=[];
-  for(let k=0;k<maxL;k++){
-    let sum=0,cnt=0;
-    for(const s of seriesArr){if(k<s.length){sum+=s[k];cnt++;}}
-    if(cnt>0) avgSeries.push(sum/cnt);
-  }
-  // x軸: 日数
-  const labels=avgSeries.map((_,k)=>k===0?'0':(k%60===0?(k/5|0)+'w':''));
-  drawHmDetailChart(avgSeries, labels, ym+'月 平均推移 ('+idxArr.length+'開始日の平均)');
+  const medianSi=idxArr[Math.floor(idxArr.length/2)];
+  const startDate=allDates[medianSi];
+
+  // その日付以降の共通日付列で runSim 相当の計算
+  _runHmDetailSim(a, startDate, `HM ${ym} (中央値開始: ${startDate})`);
 }
 
 function showHmDetailYear(yr){
-  // その年の全月を結合して平均
   if(!_hmDatesByYM||!_hmAlloc) return;
-  const yms=Object.keys(_hmDatesByYM).filter(ym=>ym.startsWith(yr));
+  const yms=Object.keys(_hmDatesByYM).filter(ym=>ym.startsWith(yr)).sort();
   if(!yms.length) return;
-  // 各月の平均系列を取得して全体平均
-  const allSeries=[];
+
+  // 年内の全開始日インデックスを集めて中央値を求める
+  const allIdxArr=[];
+  for(const ym of yms) allIdxArr.push(...(_hmDatesByYM[ym]||[]));
+  if(!allIdxArr.length) return;
+  allIdxArr.sort((a,b)=>a-b);
+  const medianSi=allIdxArr[Math.floor(allIdxArr.length/2)];
   const allDates=_commonDatesSorted;
-  const rbOn=document.getElementById('rb-toggle').checked;
-  const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
-  const fullIdx=buildIdx(allDates);
-  const{ti:FT,si:FS,gi:FG,ji:FJ,ui:FU}=fullIdx;
-  const hasJGB2=FJ[0]!==null,hasUSTB2=FU[0]!==null;
-  for(const ym of yms){
-    for(const si2 of (_hmDatesByYM[ym]||[])){
-      const n2=allDates.length-si2; if(n2<22) continue;
-      const ti3=new Float64Array(n2),si3=new Float64Array(n2),gi3=new Float64Array(n2);
-      const bt=FT[si2]/100,bs=FS[si2]/100,bg=FG[si2]/100;
-      let ji3null,ui3null;
-      if(hasJGB2){const bj=FJ[si2]/100,j3=new Float64Array(n2);for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;j3[k]=FJ[si2+k]/bj;}ji3null=Array.from(j3);}
-      else{for(let k=0;k<n2;k++){ti3[k]=FT[si2+k]/bt;si3[k]=FS[si2+k]/bs;gi3[k]=FG[si2+k]/bg;}ji3null=new Array(n2).fill(null);}
-      if(hasUSTB2){const bu=FU[si2]/100,u3=new Float64Array(n2);for(let k=0;k<n2;k++)u3[k]=FU[si2+k]/bu;ui3null=Array.from(u3);}
-      else ui3null=new Array(n2).fill(null);
-      const dates2=allDates.slice(si2);
-      const{series:ps}=portSeries(ti3,si3,gi3,ji3null,ui3null,_hmAlloc,rbOn,rbThresh,rbMode,dates2);
-      allSeries.push(ps);
-    }
-  }
-  if(!allSeries.length) return;
-  const maxL=Math.max(...allSeries.map(s=>s.length));
-  const avgSeries=[];
-  for(let k=0;k<maxL;k++){
-    let sum=0,cnt=0;
-    for(const s of allSeries){if(k<s.length){sum+=s[k];cnt++;}}
-    if(cnt>0) avgSeries.push(sum/cnt);
-  }
-  const labels=avgSeries.map((_,k)=>k===0?'0':(k%60===0?(k/5|0)+'w':''));
-  drawHmDetailChart(avgSeries, labels, yr+'年 平均推移 ('+allSeries.length+'開始日の平均)');
+  const startDate=allDates[medianSi];
+
+  _runHmDetailSim(_hmAlloc, startDate, `HM ${yr}年 (中央値開始: ${startDate})`);
 }
 
-function drawHmDetailChart(avgSeries, _unused_labels, title){
-  // HM専用stateに格納（マニュアルのcurrentDates/currentSeriesを一切変更しない）
-  const allDates = _commonDatesSorted;
-  if(!allDates || !allDates.length) return;
+// HM詳細: マニュアルシミュレーションと同じ計算・同じ描画方式で currentSeries を更新
+function _runHmDetailSim(alloc, startDate, hmLabel){
+  const rbOn=document.getElementById('rb-toggle').checked;
+  const rbThresh=parseFloat(document.getElementById('rb-threshold').value)||5;
 
-  // avgSeriesは相対インデックス0始まり（クリックした開始月〜全期間末）
-  // x軸を「経過営業日数」として使うため、相対インデックス配列を作る
-  const n = avgSeries.length;
-  const relativeDates = Array.from({length:n},(_,i)=>i===0?'0':(i%60===0?(Math.round(i/21)+'M'):''));
+  const dates=getDates(startDate);
+  if(dates.length<2) return;
 
-  hmChartDates = relativeDates;
-  hmChartSeries = {
-    hmAvg:{
-      label:'HM平均: '+title,
-      series:avgSeries.slice(),
-      color:'rgba(245,158,11,0.9)',
-      fill:false,
-      colorRGB:'245,158,11',
-      dash:[5,3]
-    }
+  const{ti,si,gi,ji,ui}=buildIdx(dates);
+  const{series:ps,rbLog}=portSeries(ti,si,gi,ji,ui,alloc,rbOn,rbThresh,rbMode,dates);
+  const metrics=calcMetrics(ps,dates);
+  lastRBLog=rbLog;
+
+  // currentSeries をマニュアルと同じ構造で構築（HM平均ラベル付き）
+  currentDates=dates;
+  currentSeries={
+    current:{
+      label:`HM平均 (${hmLabel})`,
+      series:ps,
+      color:'rgba(245,158,11,1)',
+      fill:true,
+      colorRGB:'245,158,11'
+    },
   };
+  if(rbOn){
+    const{series:psNoRB}=portSeries(ti,si,gi,ji,ui,alloc,false,0,'band',dates);
+    currentSeries.noRB={label:'RBなし',series:psNoRB,color:'rgba(245,158,11,.3)',fill:false,colorRGB:'245,158,11',dash:[4,3]};
+  }
+  currentSeries.topix={label:'TOPIX',series:ti,color:'rgba(59,130,246,.5)',fill:false,colorRGB:'59,130,246'};
+  currentSeries.sp={label:'S&P',series:si,color:'rgba(16,185,129,.5)',fill:false,colorRGB:'16,185,129'};
+  currentSeries.gold={label:'Gold',series:gi,color:'rgba(245,158,11,.5)',fill:false,colorRGB:'245,158,11'};
+  if(ji[0]!==null) currentSeries.jgb={label:'日本国債',series:ji,color:'rgba(167,139,250,.5)',fill:false,colorRGB:'167,139,250'};
+  if(ui[0]!==null) currentSeries.ustb={label:'米国債',series:ui,color:'rgba(56,189,248,.5)',fill:false,colorRGB:'56,189,248'};
 
-  drawHmChart();
+  // メトリクスパネルも更新
+  document.getElementById('m-dd').textContent='-'+(metrics.maxDD*100).toFixed(1)+'%';
+  document.getElementById('m-dd-sub').textContent='全'+dates.length+'日';
+  document.getElementById('m-ret').textContent=(metrics.cagr>=0?'+':'')+(metrics.cagr*100).toFixed(2)+'%';
+  document.getElementById('m-ret-sub').textContent=dates[0]+' 〜 '+dates[dates.length-1];
+  document.getElementById('m-neg').textContent=metrics.negDays+'日';
+  document.getElementById('m-neg-sub').textContent='元本割れ率 '+(metrics.negDays/dates.length*100).toFixed(1)+'%';
+  document.getElementById('m-ret').className='mval '+(metrics.cagr>=0?'green':'red');
+  if(rbOn){
+    const{series:psNoRB}=portSeries(ti,si,gi,ji,ui,alloc,false,0,'band',dates);
+    const mNR=calcMetrics(psNoRB,dates);
+    const diff=(metrics.cagr-mNR.cagr)*100;
+    document.getElementById('m-rb').textContent=(diff>=0?'+':'')+diff.toFixed(2)+'%';
+    document.getElementById('m-rb').className='mval '+(diff>=0?'green':'red');
+    document.getElementById('m-rb-sub').textContent='RB '+rbLog.length+'回実行 / CAGR差';
+  } else {
+    document.getElementById('m-rb').textContent='—';
+    document.getElementById('m-rb').className='mval pink';
+    document.getElementById('m-rb-sub').textContent='リバランスOFF';
+  }
+
+  redrawMainChart();
+  renderAssetCompTable(dates,ti,si,gi,ji,ui,alloc,metrics);
 
   // メインチャートにスクロール
   document.querySelector('.chart-card').scrollIntoView({behavior:'smooth',block:'nearest'});
-  // 凡例にHMラベルを目立たせる
-  setTimeout(()=>{
-    const legEl=document.getElementById('main-legend');
-    if(legEl){
-      const items=legEl.querySelectorAll('.leg-item');
-      items.forEach(el=>{
-        if(el.textContent.includes('HM平均')) el.style.fontWeight='700';
-      });
-    }
-  },100);
 }
 
 // ═══════════════════════════════════════════════════
